@@ -1,0 +1,39 @@
+:root {
+    --body-background: rgb(20, 20, 20);
+    --body-background-border-color: 38, 38, 38;
+
+    --background-color: 29, 29, 28;
+    --light-background-color: 40, 40, 40;
+    --dark-background-color: 20, 20, 20;
+
+    --background-border-color: 48, 48, 48;
+    --background-border-color-dark: 38, 38, 38;
+    --background-border-color-light: 58, 58, 58;
+
+    --primary-color: 85, 48, 112;
+    --primary-color-dark: 75, 38, 102;
+    --primary-color-light: 95, 58, 122;
+    
+    --secondary-color: 178, 167, 184;
+    --secondary-color-dark: 168, 157, 174;
+    --secondary-color-light: 188, 177, 194;
+
+    --tetriary-color: 171, 90, 64;
+    --tetriary-color-dark: 161, 80, 54;
+    --tetriary-color-light: 181, 100, 74;
+
+    --font-color: 174, 174, 174;
+    --font-color-dark: 120, 120, 120;
+    --font-color-light: 220, 220, 220;
+
+    --transition-time-short: 200ms;
+    --transition-time: 300ms;
+    --transition-time-long: 500ms;
+
+    --error-color: 230, 10, 10;
+    --success-color: 10, 230, 10;
+
+    --button-color: var(--primary-color);
+    --button-disabled-color: 100, 100, 100;
+    --button-not-allowed-color: var(--error-color);
+}

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Log In</title>
+
+    <link rel="stylesheet" href="style/root.css">
+    <link rel="stylesheet" href="style/shared.css">
+    <link rel="stylesheet" href="style/login.css">
+    
+    <script src="script/helper/util.js"></script>
+    <script src="script/helper/root.js"></script>
+    <script src="script/login.js"></script>
+</head>
+<body>
+    <div id="app-layer" class="layer">
+        <div class="window border shown" id="login-window">
+            <div class="header-block">
+                <div class="top">Header line 1</div>
+                <div class="bottom">Header line 2 longer one</div>
+            </div>
+
+            <div class="warning hidden"></div>
+
+            <div class="section">
+                <div class="input-block">
+                    <div class="label">Username / E-mail</div>
+                    <input type="text" class="input validate" id="login-username-input" placeholder=""
+                    data-validator-standard="username|email">
+                </div>
+    
+                <div class="input-block">
+                    <div class="label">Password</div>
+                    <input type="password" class="input validate" id="login-password-input" placeholder=""
+                    data-validator-standard="password">
+                </div>
+            </div>
+
+            <div class="section horizontal login-buttons-panel">
+                <div class="button" id="login-button">Log In!</div>
+                <div class="button" id="register-button" onclick="switch_window('register-window')">Register</div>
+            </div>
+        </div>
+    
+        <div class="window border" id="register-window">
+            <div class="header-block">
+                <div class="top">Header line 1</div>
+                <div class="bottom">Header line 2 longer one</div>
+            </div>
+
+            <div class="warning hidden"></div>
+            
+            <div class="section">
+                <div class="input-block">
+                    <div class="label">Username</div>
+                    <input type="text" class="input" id="register-username-input" placeholder="">
+                </div>
+    
+                <div class="input-block">
+                    <div class="label">E-mail</div>
+                    <input type="text" class="input" id="register-email-input" placeholder="">
+                </div>
+    
+                <div class="input-block">
+                    <div class="label">Password</div>
+                    <input type="password" class="input" id="register-password-input" placeholder="">
+                </div>
+    
+                <div class="input-block">
+                    <div class="label">Repeat Password</div>
+                    <input type="password" class="input" id="register-password-repeat-input" placeholder="">
+                </div>
+            </div>
+
+            <div class="section horizontal">
+                <div class="button" id="register-button">Register!</div>
+            </div>
+        </div>
+    
+        <div class="window border" id="forgotten-password-window">
+            <div class="header-block">
+                <div class="top">Header line 1</div>
+                <div class="bottom">Header line 2 longer one</div>
+            </div>
+
+            <div class="warning hidden"></div>
+
+            <div class="section vertical">
+                <div class="label">E-mail</div>
+                <input type="text" class="input" id="forgotten-password-email-input" placeholder="">
+            </div>
+
+            <div class="section horizontal">
+                <div class="button" id="forgotten-password-button">Reset my password!</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="floating-layer" class="layer"></div>
+</body>
+</html>
