@@ -10,13 +10,18 @@
     <link rel="stylesheet" href="style/shared.css">
     <link rel="stylesheet" href="style/login.css">
     
+    <script src="script/helper/forge.min.js"></script>
+    <script src="script/helper/aes.js"></script>
+    <script src="script/helper/rsa.js"></script>
+    <script src="script/helper/socket.js"></script>
+
     <script src="script/helper/util.js"></script>
     <script src="script/helper/root.js"></script>
     <script src="script/login.js"></script>
 </head>
 <body>
     <div id="app-layer" class="layer">
-        <div class="window border shown" id="login-window">
+        <div class="window border" id="login-window">
             <div class="header-block">
                 <div class="top">Header line 1</div>
                 <div class="bottom">Header line 2 longer one</div>
@@ -33,18 +38,24 @@
     
                 <div class="input-block">
                     <div class="label">Password</div>
-                    <input type="password" class="input validate" id="login-password-input" placeholder=""
-                    data-validator-standard="password">
+                    <input type="password" class="input validate" id="login-password-input" placeholder="" data-validator-standard="password">
                 </div>
             </div>
 
-            <div class="section horizontal login-buttons-panel">
-                <div class="button" id="login-button">Log In!</div>
-                <div class="button" id="register-button" onclick="switch_window('register-window')">Register</div>
+            <div class="section horizontal buttons-panel">
+                <div class="button button-style" id="login-button">Log In!</div>
+                <div class="button button-style" id="register-button" onclick="switch_window('register-window')">Register</div>
             </div>
         </div>
     
-        <div class="window border" id="register-window">
+        <div class="window border shown" id="register-window">
+            <div class="back-button-box button" onclick="switch_window('login-window')">
+                <div class="label">Back</div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
+                </svg>
+            </div>
+
             <div class="header-block">
                 <div class="top">Header line 1</div>
                 <div class="bottom">Header line 2 longer one</div>
@@ -55,31 +66,38 @@
             <div class="section">
                 <div class="input-block">
                     <div class="label">Username</div>
-                    <input type="text" class="input" id="register-username-input" placeholder="">
+                    <input type="text" class="input" id="register-username-input" placeholder="" data-validator-standard="username">
                 </div>
     
                 <div class="input-block">
                     <div class="label">E-mail</div>
-                    <input type="text" class="input" id="register-email-input" placeholder="">
+                    <input type="text" class="input" id="register-email-input" placeholder="" data-validator-standard="email">
                 </div>
     
                 <div class="input-block">
                     <div class="label">Password</div>
-                    <input type="password" class="input" id="register-password-input" placeholder="">
+                    <input type="password" class="input" id="register-password-input" placeholder="" data-validator-standard="password">
                 </div>
     
                 <div class="input-block">
                     <div class="label">Repeat Password</div>
-                    <input type="password" class="input" id="register-password-repeat-input" placeholder="">
+                    <input type="password" class="input" id="register-password-repeat-input" placeholder="" data-validator-linked="register-password-input">
                 </div>
             </div>
 
-            <div class="section horizontal">
-                <div class="button" id="register-button">Register!</div>
+            <div class="section horizontal buttons-panel">
+                <div class="button button-style" id="register-button">Register!</div>
             </div>
         </div>
     
         <div class="window border" id="forgotten-password-window">
+            <div class="back-button-box button" onclick="switch_window('login-window')">
+                <div class="label">Back</div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
+                </svg>
+            </div>
+
             <div class="header-block">
                 <div class="top">Header line 1</div>
                 <div class="bottom">Header line 2 longer one</div>
@@ -93,7 +111,7 @@
             </div>
 
             <div class="section horizontal">
-                <div class="button" id="forgotten-password-button">Reset my password!</div>
+                <div class="button button-style" id="forgotten-password-button">Reset my password!</div>
             </div>
         </div>
     </div>
