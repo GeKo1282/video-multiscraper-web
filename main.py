@@ -1,21 +1,33 @@
-import json, os
-from typing import List, Optional, AnyStr, Tuple, Any
+import json, os, base64
+from typing import List, Optional, AnyStr, Tuple, Any, Literal, Union, Callable, Dict
 from pathlib import Path
-from scripts.webserver import WebServer
-from scripts.api import Extender as APIExtender
+from threading import Thread
+from scripts.helper.http import WebServer
+from scripts.helper.socket import WebSocketServer, WebSocketClientProtocol, websockets, SocketSession
+from scripts.webserver import WebExtender
+from scripts.api import APIExtender
 from scripts.helper.logger import Fore, Color
+from scripts.helper.cipher import RSACipher, AESCipher
+from scripts.helper.util import generate_id
 
 class ProgramController:
     def __init__(self, prepare: bool = False):
         self.webserver: WebServer = WebServer()
-        self.api_extender: APIExtender = None
+        self.websocketserver: WebSocketServer = WebSocketServer()
+
+        self.rsa: RSACipher = None
 
         self.settings: dict = {}
+        self.websocket_sessions: Dict[WebSocketClientProtocol, SocketSession] = {}
 
         self.default_settings = {
+            "rsa": {
+                "keyfile": "data/rsa.key",
+                "keysize": 4096
+            },
             "webserver": {
                 "host": "0.0.0.0",
-                "port": 80
+                "port": 5000
             },
             "socketserver": {
                 "host": "0.0.0.0",
@@ -28,24 +40,35 @@ class ProgramController:
 
     def prepare(self):
         self.settings = self.load_settings()
-        print(self.settings)
-
-        self.api_extender = APIExtender(socket_host=self.settings['socketserver']['host'], socket_port=self.settings['socketserver']['port'])
-
-        self.webserver.add_path("/", ["POST"], self.api_extender)
-        self.webserver.register_paths()
+        
+        self.rsa = RSACipher()
+        if self.settings['rsa']['keyfile'] and Path(self.settings['rsa']['keyfile']).exists():
+            with open(self.settings['rsa']['keyfile'], "rb") as f:
+                key_data = json.loads(base64.b64decode(f.read()))
+            self.rsa.import_public_key(key_data['public'])
+            self.rsa.import_private_key(key_data['private'])
+        else:
+            keypair = self.rsa.generate_keypair(self.settings['rsa']['keysize'])
+            with open(self.settings['rsa']['keyfile'], "wb") as f:
+                f.write(base64.b64encode(json.dumps({"private": keypair[0], "public": keypair[1]}).encode()))
+        
+        host = self.settings['socketserver']['host'] if self.settings['socketserver']['host'] != self.settings['webserver']['host'] and not self.settings['socketserver']['host'] == "0.0.0.0" else ""
+        self.webserver.add_path("/", ["POST"], APIExtender(socket_host=host, socket_port=self.settings['socketserver']['port'], public_rsa_key=self.rsa.public_key()))
+        self.webserver.extend(WebExtender())
 
     def load_settings(self, settings_path: str = "data/settings.json") -> dict:
         # Loads, checks if valid and corrects settings if necessary
-        def validator(settings: dict, parent_path: Optional[List[str]] = None, validate_to: dict = self.default_settings) -> dict:
+        def validator(settings: dict, parent_path: Optional[List[str]] = None, validate_to: dict = self.default_settings) -> Union[Literal[True], List[Tuple[List[str], Any]]]:
             missing = []
             for key in validate_to.keys():
-                if not key in settings.keys():
+                if not key in settings.keys() or type(settings[key]) != type(validate_to[key]):
                     missing.append(((parent_path or []) + [key], validate_to[key]))
                     continue
 
                 if type(validate_to[key]) == dict:
-                    missing += validator(settings[key], (parent_path or []) + [key], validate_to[key])
+                    validated = validator(settings[key], (parent_path or []) + [key], validate_to[key])
+                    if validated != True:
+                        missing.extend(validated)
 
             return missing or True
         
@@ -77,6 +100,8 @@ class ProgramController:
             for compliment in compliments:
                 update_nested_dict(settings, compliment[0], compliment[1])
 
+            return settings
+
         settings_path = Path(settings_path).absolute()
 
         if not settings_path.exists():
@@ -89,27 +114,97 @@ class ProgramController:
         validated = validator(settings)
         if validated != True:
             print(f"Some settings are missing!")
+
             for index, missing in enumerate(validated):
                 print(f"{index + 1}. {parser(missing[0], missing[1], color_dict={'path_part': Fore.YELLOW, 'splitter': Fore.CYAN, 'end': Fore.RED})}")
+
             print(f"Those defaults will be used during runtime. If you would like to change them, please edit the settings file at {Fore.YELLOW}{settings_path}{Color.RESET} and restart the program.")
             print(f"Would you like to save the defaults to the settings file? ([Y]es/[N]o): ", end="")
-            while response := input().lower()[1:]:
+            
+            while True:
+                response = input().lower()
                 if response in ["y", "yes"]:
+                    settings = compliment(settings, validated)
                     with open(settings_path, "w") as f:
                         json.dump(self.default_settings, f, indent=4)
                     print(f"Settings saved to {Fore.YELLOW}{settings_path}{Color.RESET}.")
-                    break
+                    return settings
                 elif response in ["n", "no"]:
                     print(f"Settings not saved, but will be used during runtime.")
                     settings = compliment(settings, validated)
-                    break
+                    return settings
                 else:
                     print(f"Invalid input. Please try again: ", end="")
-
+        
         return settings
 
+    def detach(self, callback: Callable, executor: Union[Callable, Thread] = Thread, *args, **kwargs) -> Thread:
+        thread = executor(target=callback, args=args, kwargs=kwargs)
+        thread.start()
+        return thread
+
+    async def handle_websocket(self, websocket: WebSocketClientProtocol) -> None:
+        def send_error(error: str, code: int = 400):
+            websocket.send(f"{code}: {error}")
+
+        socket_id = generate_id(avoid=list(self.websocket_sessions.keys()))
+        self.websocket_sessions[socket_id] = SocketSession()
+        session = self.websocket_sessions[socket_id]
+
+        session.state = SocketSession.State.CONNECTED
+        session.socket = websocket
+        session.id = socket_id
+        session.address = websocket.remote_address
+        session.public_rsa_key = None
+        session.aes_key = None
+
+        aes_cipher = AESCipher(False)
+
+        while True:
+            try:
+                data = await websocket.recv()
+            except (websockets.exceptions.ConnectionClosedError, websockets.exceptions.ConnectionClosedOK):
+                break
+
+            if session.state == SocketSession.State.RSA_ENCRYPTED:
+                try:
+                    data = self.rsa.decrypt(data)
+                except:
+                    await send_error("Invalid RSA encrypted data")
+                    continue
+
+            if session.state == SocketSession.State.AES_ENCRYPTED:
+                try:
+                    iv, data = data[:16], data[16:]
+                    data = aes_cipher.decrypt(data, iv, session.aes_key)
+                except:
+                    await send_error("Invalid AES encrypted data")
+                    continue
+
+            try:
+                data: dict = json.loads(data)
+            except:
+                await send_error("Invalid JSON data")
+                continue
+
+            if data.get('action') == 'get-rsa-key':
+                await websocket.send(json.dumps({
+                    "action": "send-rsa-key",
+                    "data": {
+                        "key": self.rsa.public_key()
+                    }
+                }))
+                session.state = SocketSession.State.RSA_ENCRYPTED
+                continue
+
+
+            print(f"Received: {data}")
+
+        del self.websocket_sessions[websocket]
+
     def start(self):
-        pass
+        self.websocketserver.start(host=self.settings['socketserver']['host'], port=self.settings['socketserver']['port'], handler=self.handle_websocket, as_thread=True)
+        self.webserver.run(self.settings['webserver']['host'], self.settings['webserver']['port'])
 
 
 def main():

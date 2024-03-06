@@ -6,7 +6,7 @@ from websockets.server import (
 from websockets.client import WebSocketClientProtocol
 import socket, threading, asyncio
 from socket import socket as Socket
-from typing import Optional
+from typing import Optional, Tuple
 
 def int_to_bytes(number: int, numbytes: int = 8):
     return number.to_bytes(numbytes, "big")
@@ -114,12 +114,15 @@ class SocketClient:
         return True
 
 class WebSocketServer:
-    def __init__(self, host: str = "0.0.0.0", port: int = 5555) -> None:
-        self.host: str = host
-        self.port: int = port
+    def __init__(self,) -> None:
+        self.host: str = None
+        self.port: int = None
         self.socket_server: WSServer = None
 
-    def start(self, handler: callable, as_thread: bool = True) -> Optional[threading.Thread]:        
+    def start(self, host: str = "0.0.0.0", port: int = 5555, *, handler: callable, as_thread: bool = True) -> Optional[threading.Thread]:        
+        self.host = host
+        self.port = port
+        
         async def inner():
             async with serve(host=self.host, port=self.port, ws_handler=handler) as server:
                 self.socket_server = server
@@ -132,6 +135,23 @@ class WebSocketServer:
             return thread
         
         asyncio.run(inner())
+
+class SocketState:
+    CONNECTED = 0
+    RSA_ENCRYPTED = 1
+    AES_ENCRYPTED = 2
+    AUTHORIZED = 3
+    DISCONNECTED = -1
+
+class SocketSession:
+    State = SocketState
+    def __init__(self) -> None:
+        self.state: int = self.State.DISCONNECTED
+        self.socket: WebSocketClientProtocol = None
+        self.id: str = None
+        self.address: Tuple[str, int] = None
+        self.public_rsa_key: str = None
+        self.aes_key: str = None   
 
 class AddressAlreadyBoundError(Exception):
     pass

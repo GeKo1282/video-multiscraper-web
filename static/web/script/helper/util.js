@@ -1,6 +1,16 @@
 if (!window.global) window.global = {};
 global = window.global;
 
+global.LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 10,
+    WARNING: 20,
+    ERROR: 30,
+    CRITICAL: 40
+}
+
+global.LOG = global.LOG_LEVELS.INFO;
+
 global.standard_validators = {
     'username': (value) => {
         for (let character of value) {
@@ -116,20 +126,22 @@ function make_validator_function(type, data) {
     };
 }
 
-async function initialize_websocket_communications() {
+async function initialize_websocket_communications(regular_handler, authorization) {
     let continue_setup = false;
 
     if (!global.rsa) {
         const worker = new Worker('./script/helper/worker.js');
+
         worker.onmessage = (e) => {
             if (e.data.message == 'rsa-keypair') {
-                global.rsa = new RSACipher();
+                global.rsa = new RSACipher(false);
                 global.rsa.import_public_key(e.data.data.public_key, e.data.data.max_length);
                 global.rsa.import_private_key(e.data.data.private_key);
                 continue_setup = true;
             }
         }
-        worker.postMessage({'action': 'generate-rsa-key'});
+
+        worker.postMessage({'action': 'generate-rsa-keypair'});
     } else {
         continue_setup = true;
     }
@@ -144,16 +156,28 @@ async function initialize_websocket_communications() {
     }
 
     if (!global.websocket) {
-        let websocket_data = await (await fetch('/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                'action': 'get-websocket-data'
-            })
-        })).json();
+        let websocket_address = await get_socket_address();
 
-        global.websocket = new WebSocketClient(`ws://${websocket_data.host}:${websocket_data.port}`, global.rsa, global.aes);
+        global.websocket = new WebSocketClient(websocket_address, global.rsa, global.aes);
+
+        global.websocket.onmessage = (message) => {
+            let data = null;
+
+            try {
+                data = JSON.parse(message.data);
+            } catch (e) {}
+
+            try {
+                data = JSON.parse(global.aes.decrypt(message.data));
+            } catch (e) {}
+
+            try {
+                data = JSON.parse(global.rsa.decrypt(message.data));
+            } catch (e) {}
+
+            console.log('Received message:', data);
+        }
+
+        global.websocket.start();
     }
 }

@@ -5,7 +5,7 @@ async function get_socket_address() {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            'action': 'get-socket-address'
+            'action': 'get-websocket-address'
         })
     })).json();
 
@@ -32,7 +32,7 @@ class WebSocketClient {
     #failed_reloads = 0;
     #ready = false;
 
-    constructor(address, rsa_cipher, aes_cipher, failed_reloads = 0) {
+    constructor(address, rsa_cipher, aes_cipher, failed_reloads = 5) {
         this.address = address;
         this.#failed_reloads = failed_reloads;
         this.rsa_cipher = rsa_cipher;
@@ -80,8 +80,8 @@ class WebSocketClient {
             throw 'onmessage handler must be set!';
 
         if (!this.#onopen_handler) this.#onopen_handler = () => {};
-
-        this.#socket = new WebSocket('ws://' + this.address);
+        
+        this.#socket = new WebSocket(`ws://${this.address}`);
         this.#socket.onopen = async () => {await this.#setup()};
         this.#socket.onmessage = async (message) => {this.#setup_handler(message)};
     }
@@ -101,13 +101,13 @@ class WebSocketClient {
         let message_json = JSON.parse(message.data);
 
         if (message_json.action == 'send-rsa-key') {
-            if (!message_json.key) {
+            if (!message_json.data.key) {
                 this.#setup_action_fails++;
                 this.#fail_reload();
                 this.#request_server_rsa();
             }
 
-            this.#server_rsa_key = message_json.key;
+            this.#server_rsa_key = message_json.data.key;
 
             if (global.LOG <= global.LOG_LEVELS.DEBUG) {
                 console.log("Received server RSA key!" + global.LOG <= global.LOG_LEVELS.ULTRA_DEBUG? ("The key is: " + this.#server_rsa_key): "");

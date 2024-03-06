@@ -24,18 +24,9 @@ addLoadEvent(() => {
 
 addLoadEvent(async () => {
     // Get data about and connect to socket
-
-    let data = await fetch('/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            action: 'get-socket-data'
-        })
+    await initialize_websocket_communications((message) => {
+        console.log(message);
     });
-
-    console.log(await data.json());
 });
 
 function login() {

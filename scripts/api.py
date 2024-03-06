@@ -1,6 +1,7 @@
 from flask import request, jsonify
+from scripts.helper.http import Extender
 
-class Extender:
+class APIExtender(Extender):
     def __init__(self, socket_host: str, socket_port: int, public_rsa_key: str) -> None:
         self._socket_host: str = socket_host
         self._socket_port: int = socket_port
@@ -11,19 +12,20 @@ class Extender:
             return 'Invalid request', 400
         
         data = request.get_json()
-        if data.get('action') == "get-websocket-data":
-            return self.get_websocket_data()
+        if data.get('action') == "get-websocket-address":
+            return self.get_websocket_address()
         
-        if data.get('action') == "get-public-key":
-            return self.get_public_key()
+        if data.get('action') == "get-rsa-key":
+            return self.get_rsa_key()
+        
+        return 'Invalid request', 400
 
-    def get_websocket_data(self,):
+    def get_websocket_address(self,):
         return jsonify({
-            "host": self._socket_host or "",
-            "port": self._socket_port or -1
+            "address": f"{self._socket_host}:{self._socket_port}"
         })
     
-    def get_public_key(self,):
+    def get_rsa_key(self,):
         return jsonify({
             "public_rsa_key": self._public_rsa_key or ""
         })

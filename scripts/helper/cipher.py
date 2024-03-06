@@ -47,11 +47,29 @@ class RSACipher():
     def __init__(self, generate_keypair: bool = False):
         self.keypair = self.generate_keypair() if generate_keypair else None
 
-    def generate_keypair(self, key_length: int = 2048) -> Tuple[str, str]:
+    def generate_keypair(self, key_length: int = 2048, set_keypair: bool = True) -> Tuple[str, str]:
         key = RSA.generate(key_length)
         private_key = key.export_key().decode()
         public_key = key.publickey().export_key().decode()
+
+        if set_keypair:
+            self.keypair = (private_key, public_key)
+            
         return private_key, public_key
+    
+    def import_private_key(self, key: Union[str, bytes]) -> str:
+        key = key if type(key) == str else key.decode('utf-8')
+        if self.keypair:
+            self.keypair = (key, self.keypair[1])
+        else:
+            self.keypair = (key, None)
+
+    def import_public_key(self, key: Union[str, bytes]) -> str:
+        key = key if type(key) == str else key.decode('utf-8')
+        if self.keypair:
+            self.keypair = (self.keypair[0], key)
+        else:
+            self.keypair = (None, key)
     
     def encrypt(self, plaintext: Union[str, bytes], public_key: Union[str, bytes] = None) -> str:
         public_key = public_key if public_key else self.keypair[1]
