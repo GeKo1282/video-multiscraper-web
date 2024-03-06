@@ -115,3 +115,45 @@ function make_validator_function(type, data) {
         }
     };
 }
+
+async function initialize_websocket_communications() {
+    let continue_setup = false;
+
+    if (!global.rsa) {
+        const worker = new Worker('./script/helper/worker.js');
+        worker.onmessage = (e) => {
+            if (e.data.message == 'rsa-keypair') {
+                global.rsa = new RSACipher();
+                global.rsa.import_public_key(e.data.data.public_key, e.data.data.max_length);
+                global.rsa.import_private_key(e.data.data.private_key);
+                continue_setup = true;
+            }
+        }
+        worker.postMessage({'action': 'generate-rsa-key'});
+    } else {
+        continue_setup = true;
+    }
+
+    if (!global.aes) {
+        global.aes = new AESCipher();
+        global.aes.generate_key(32);
+    }
+
+    while (!continue_setup) {
+        await sleep(50);
+    }
+
+    if (!global.websocket) {
+        let websocket_data = await (await fetch('/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                'action': 'get-websocket-data'
+            })
+        })).json();
+
+        global.websocket = new WebSocketClient(`ws://${websocket_data.host}:${websocket_data.port}`, global.rsa, global.aes);
+    }
+}
