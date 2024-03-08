@@ -144,8 +144,42 @@ class ProgramController:
         return thread
 
     async def handle_websocket(self, websocket: WebSocketClientProtocol) -> None:
-        def send_error(error: str, code: int = 400):
-            websocket.send(f"{code}: {error}")
+        class CouldNotLoadData(Exception):
+            pass
+
+        async def send_error(error: str, code: int = 400):
+            await WebSocketServer.send(websocket, {
+                "error": error,
+                "code": code
+            }, session)
+
+        async def decrypt(data: bytes, session: SocketSession) -> dict:
+            data = data.decode("utf-8") if isinstance(data, bytes) else data
+            try:
+                return json.loads(data)
+            except:
+                pass
+
+            if session.state >= SocketSession.State.ENCRYPTED and session.encryption_state == SocketSession.EncryptionState.AES_ENCRYPTED:
+                try:
+                    iv, data = data.split("::")
+                    iv = self.rsa.decrypt(iv).decode("utf-8")
+                    data = aes_cipher.decrypt(data, iv, base64.b64decode(session.aes_key))
+                    return json.loads(data)
+                except:
+                    pass
+            
+            try:
+                data = self.rsa.decrypt(data)
+                return json.loads(data)
+            except:
+                pass
+
+            if session.state >= SocketSession.State.ENCRYPTED:
+                await send_error("Could not read data.")
+                raise CouldNotLoadData
+            
+            return data
 
         socket_id = generate_id(avoid=list(self.websocket_sessions.keys()))
         self.websocket_sessions[socket_id] = SocketSession()
@@ -162,41 +196,47 @@ class ProgramController:
 
         while True:
             try:
-                data = await websocket.recv()
+                data: Union[dict, str] = await decrypt(await websocket.recv(), session)
             except (websockets.exceptions.ConnectionClosedError, websockets.exceptions.ConnectionClosedOK):
                 break
-
-            if session.state == SocketSession.State.RSA_ENCRYPTED:
-                try:
-                    data = self.rsa.decrypt(data)
-                except:
-                    await send_error("Invalid RSA encrypted data")
-                    continue
-
-            if session.state == SocketSession.State.AES_ENCRYPTED:
-                try:
-                    iv, data = data[:16], data[16:]
-                    data = aes_cipher.decrypt(data, iv, session.aes_key)
-                except:
-                    await send_error("Invalid AES encrypted data")
-                    continue
-
-            try:
-                data: dict = json.loads(data)
-            except:
-                await send_error("Invalid JSON data")
+            except CouldNotLoadData:
                 continue
 
+            if type(data) != dict:
+                data = {
+                    "nondict": data
+                }
+
             if data.get('action') == 'get-rsa-key':
-                await websocket.send(json.dumps({
+                session.state = SocketSession.State.ENCRYPTED
+                session.encryption_state = SocketSession.EncryptionState.INCOMING_RSA_ENCRYPTED
+                await WebSocketServer.send(websocket, {
                     "action": "send-rsa-key",
                     "data": {
                         "key": self.rsa.public_key()
                     }
-                }))
-                session.state = SocketSession.State.RSA_ENCRYPTED
+                }, session)
                 continue
 
+            if data.get('action') == 'send-rsa-key':
+                session.public_rsa_key = data['data']['key']
+                session.state = SocketSession.State.ENCRYPTED
+                session.encryption_state = SocketSession.EncryptionState.FULL_RSA_ENCRYPTED
+                await WebSocketServer.send(websocket, {
+                    "action": "receive-rsa-key",
+                    "success": True
+                }, session)
+                continue
+
+            if data.get('action') == 'send-aes-key':
+                session.aes_key = data['data']['key']
+                session.state = SocketSession.State.ENCRYPTED
+                session.encryption_state = SocketSession.EncryptionState.AES_ENCRYPTED
+                await WebSocketServer.send(websocket, {
+                    "action": "receive-aes-key",
+                    "success": True
+                }, session, rsa_only=True)
+                continue
 
             print(f"Received: {data}")
 

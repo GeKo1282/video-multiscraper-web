@@ -24,9 +24,12 @@ addLoadEvent(() => {
 
 addLoadEvent(async () => {
     // Get data about and connect to socket
-    await initialize_websocket_communications((message) => {
+    await initialize_websocket_communications((decrypted, message) => {
+        console.log(decrypted);
         console.log(message);
     });
+
+    global.websocket.send('test');
 });
 
 function login() {

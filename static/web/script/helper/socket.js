@@ -56,17 +56,15 @@ class WebSocketClient {
     #send_rsa_key() {
         this.#socket.send(JSON.stringify({
             action: 'send-rsa-key',
-            key: this.rsa_cipher.public_key[0]
+            data: {key: this.rsa_cipher.public_key[0]}
         }));
     }
     
     #send_aes_key() {
-        let ciphertext = this.rsa_cipher.encrypt(this.aes_cipher.key, this.#server_rsa_key)
-
-        this.#socket.send(JSON.stringify({
+        this.#socket.send(this.rsa_cipher.encrypt(JSON.stringify({
             action: 'send-aes-key',
-            key: ciphertext
-        }));
+            data: {key: this.aes_cipher.key}
+        }), this.#server_rsa_key));
     }
     
     #fail_reload() {
@@ -90,15 +88,32 @@ class WebSocketClient {
         this.#request_server_rsa();
 
         while (!this.#server_rsa_key) {
-            await sleep(500);
+            await sleep(50);
         }
 
         this.#send_rsa_key();
+
+        while (!this.#setup_succeded['send-rsa-public-key']) {
+            await sleep(50);
+        }
+        
         this.#send_aes_key();
     }
 
     #setup_handler(message) {
-        let message_json = JSON.parse(message.data);
+        let message_json = null;
+        try {
+            message_json = JSON.parse(message.data);
+        } catch (e) {
+            try {
+                message_json = JSON.parse(this.rsa_cipher.decrypt(message.data));
+            } catch (e) {
+                if (global.LOG <= global.LOG_LEVELS.ERROR) {
+                    console.error('Failed to parse message as JSON!\n' + message.data);
+                }
+                return;
+            }
+        }
 
         if (message_json.action == 'send-rsa-key') {
             if (!message_json.data.key) {
@@ -110,7 +125,7 @@ class WebSocketClient {
             this.#server_rsa_key = message_json.data.key;
 
             if (global.LOG <= global.LOG_LEVELS.DEBUG) {
-                console.log("Received server RSA key!" + global.LOG <= global.LOG_LEVELS.ULTRA_DEBUG? ("The key is: " + this.#server_rsa_key): "");
+                console.log("Received server RSA key!" + (global.LOG <= global.LOG_LEVELS.ULTRA_DEBUG? ("The key is: " + this.#server_rsa_key): ""));
             }
         }
     
@@ -155,22 +170,34 @@ class WebSocketClient {
     }
 
     #regular_handler(message) {
-        let iv = this.rsa_cipher.decrypt(message.data.substring(0, 344));
-        let data = message.data.substring(344);
-        
-        let decrypted = this.aes_cipher.decrypt(data, this.aes_cipher.key, iv);
+        let decrypted = null;
+        try {
+            let [enc_iv, data] = message.data.split('::');
+            let iv = this.rsa_cipher.decrypt(enc_iv);
+            
+            decrypted = this.aes_cipher.decrypt(data, this.aes_cipher.key, iv);
+        } catch (e) {
+            try {
+                decrypted = this.rsa_cipher.decrypt(message.data);
+            } catch (e) {
+                if (global.LOG <= global.LOG_LEVELS.ERROR) {
+                    console.error('Failed to decrypt message!\n' + message.data);
+                }
+            }
+        }
+
         this.#onmessage_handler(decrypted, message);
     }
 
     send(data) {
         let [encrypted, iv] = this.aes_cipher.encrypt(data);
-        iv = this.rsa_cipher.encrypt(iv, this.#server_rsa_key);
+        let enc_iv = this.rsa_cipher.encrypt(iv, this.#server_rsa_key);
 
         if (global.LOG <= global.LOG_LEVELS.ULTRA_DEBUG) {
-            console.log('Sending message:\n', {iv: iv, data: encrypted, iv_length: iv.length, data_length: encrypted.length, original_message: data});
+            console.log('Sending message:\n', {iv: iv, data: encrypted, iv_length: enc_iv.length, data_length: encrypted.length, original_message: data});
         }
 
-        this.#socket.send(iv + encrypted); //IV should always be 344 bytes long (as it is base64 encoded + rsa encrypted)
+        this.#socket.send(enc_iv + "::" + encrypted); //IV should always be 344 bytes long (as it is base64 encoded + rsa encrypted)
     }
 
     get ready() {

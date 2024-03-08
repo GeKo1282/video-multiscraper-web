@@ -2,6 +2,7 @@ if (!window.global) window.global = {};
 global = window.global;
 
 global.LOG_LEVELS = {
+    ULTRA_DEBUG: -1,
     DEBUG: 0,
     INFO: 10,
     WARNING: 20,
@@ -9,7 +10,7 @@ global.LOG_LEVELS = {
     CRITICAL: 40
 }
 
-global.LOG = global.LOG_LEVELS.INFO;
+global.LOG = global.LOG_LEVELS.DEBUG;
 
 global.standard_validators = {
     'username': (value) => {
@@ -160,24 +161,12 @@ async function initialize_websocket_communications(regular_handler, authorizatio
 
         global.websocket = new WebSocketClient(websocket_address, global.rsa, global.aes);
 
-        global.websocket.onmessage = (message) => {
-            let data = null;
-
-            try {
-                data = JSON.parse(message.data);
-            } catch (e) {}
-
-            try {
-                data = JSON.parse(global.aes.decrypt(message.data));
-            } catch (e) {}
-
-            try {
-                data = JSON.parse(global.rsa.decrypt(message.data));
-            } catch (e) {}
-
-            console.log('Received message:', data);
-        }
+        global.websocket.onmessage = regular_handler;
 
         global.websocket.start();
+    }
+
+    while (!global.websocket.ready) {
+        await sleep(50);
     }
 }

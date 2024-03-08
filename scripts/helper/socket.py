@@ -1,4 +1,4 @@
-import websockets
+import websockets, json, base64
 from websockets.server import (
     serve,
     WebSocketServer as WSServer
@@ -6,7 +6,8 @@ from websockets.server import (
 from websockets.client import WebSocketClientProtocol
 import socket, threading, asyncio
 from socket import socket as Socket
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
+from scripts.helper.cipher import AESCipher, RSACipher
 
 def int_to_bytes(number: int, numbytes: int = 8):
     return number.to_bytes(numbytes, "big")
@@ -136,17 +137,43 @@ class WebSocketServer:
         
         asyncio.run(inner())
 
+    @staticmethod
+    async def send(socket: WebSocketClientProtocol, data: Union[bytes, str, dict], session: "SocketSession", *, rsa_only: bool = False, unencrypted: bool = False) -> None:
+        data = json.dumps(data) if isinstance(data, dict) else data
+        data = data if isinstance(data, str) else data.decode("utf-8")
+
+        if session.state == session.State.ENCRYPTED and session.encryption_state == session.EncryptionState.AES_ENCRYPTED and session.aes_key and not unencrypted and not rsa_only:
+            ciphertext, iv = AESCipher(False).encrypt(data, base64.b64decode(session.aes_key))
+            iv = RSACipher(False).encrypt(iv, session.public_rsa_key)
+            await socket.send(iv + "::" + ciphertext)
+            return
+
+        if session.state == session.State.ENCRYPTED and session.encryption_state == session.EncryptionState.FULL_RSA_ENCRYPTED and session.public_rsa_key and not unencrypted:
+            await socket.send(RSACipher(False).encrypt(data, session.public_rsa_key))
+            return
+
+        await socket.send(data)        
+
 class SocketState:
     CONNECTED = 0
-    RSA_ENCRYPTED = 1
-    AES_ENCRYPTED = 2
-    AUTHORIZED = 3
+    ENCRYPTED = 1
+    AUTHORIZED = 2
     DISCONNECTED = -1
+
+class EncyptionState:
+    UNENCRYPTED = 0
+    INCOMING_RSA_ENCRYPTED = 1
+    FULL_RSA_ENCRYPTED = 2
+    AES_ENCRYPTED = 3
+    AES_EXPIRED = 4
 
 class SocketSession:
     State = SocketState
+    EncryptionState = EncyptionState
+
     def __init__(self) -> None:
         self.state: int = self.State.DISCONNECTED
+        self.encryption_state: int = EncyptionState.UNENCRYPTED
         self.socket: WebSocketClientProtocol = None
         self.id: str = None
         self.address: Tuple[str, int] = None
