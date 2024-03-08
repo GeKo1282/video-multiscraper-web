@@ -1,0 +1,2 @@
+### What is it?
+This is a web-based platform with intent to scrap up and download many types of content (movies, anime, music etc.) from "generous people" (or as some people like to call them "Sailors Of The Seas") in order to enable easy, ad and tear-free watching and archivisation of media that might become lost in the future.
