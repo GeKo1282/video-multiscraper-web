@@ -4,6 +4,15 @@ if (!window.global)
 global = window.global;
 
 addLoadEvent(() => {
+    let username = (new URLSearchParams(window.location.search)).get('username');
+
+    if (username) {
+        document.getElementById('login-username-input').value = atob(username);
+        if (document.getElementById('login-password-input').oninput) document.getElementById('login-password-input').oninput();
+    }
+});
+
+addLoadEvent(() => {
     // Generate RSA keypair
 
     const worker = new Worker('./script/helper/worker.js');
@@ -24,19 +33,40 @@ addLoadEvent(() => {
 
 addLoadEvent(async () => {
     // Get data about and connect to socket
-    await initialize_websocket_communications((decrypted, message) => {
-        console.log(decrypted);
-        console.log(message);
-    });
+    await initialize_websocket_communications((decrypted, _message_object) => {
+        decrypted = JSON.parse(decrypted);
 
-    global.websocket.send('test');
+        if (decrypted.action == 'login') {
+            if (decrypted.success) {
+                sessionStorage.setItem('token', decrypted.data.token);
+                window.location.href = '/';
+            } else {
+                alert('Invalid username or password');
+            }
+        }
+
+        console.log(decrypted);
+    });
 });
 
-function login() {
-    var username = document.getElementById('login-username-input').value;
-    var password = document.getElementById('login-username-password').value;
-    var data = {
-        username: username,
-        password: password
-    };
+async function login() {
+    let username = document.getElementById('login-username-input').value;
+    let password = document.getElementById('login-password-input').value;
+
+    
+    let md = forge.md.sha512.create();
+    md.update(password);
+    let password_hash = md.digest().toHex();
+
+    while (!global.websocket.ready) {
+        await sleep(50);
+    }
+
+    global.websocket.send(JSON.stringify({
+        action: 'login',
+        data: {
+            username: username,
+            password: password_hash
+        }
+    }));
 }

@@ -142,13 +142,13 @@ class WebSocketServer:
         data = json.dumps(data) if isinstance(data, dict) else data
         data = data if isinstance(data, str) else data.decode("utf-8")
 
-        if session.state == session.State.ENCRYPTED and session.encryption_state == session.EncryptionState.AES_ENCRYPTED and session.aes_key and not unencrypted and not rsa_only:
+        if session.state >= session.State.ENCRYPTED and session.encryption_state == session.EncryptionState.AES_ENCRYPTED and session.aes_key and not unencrypted and not rsa_only:
             ciphertext, iv = AESCipher(False).encrypt(data, base64.b64decode(session.aes_key))
             iv = RSACipher(False).encrypt(iv, session.public_rsa_key)
             await socket.send(iv + "::" + ciphertext)
             return
 
-        if session.state == session.State.ENCRYPTED and session.encryption_state == session.EncryptionState.FULL_RSA_ENCRYPTED and session.public_rsa_key and not unencrypted:
+        if session.state >= session.State.ENCRYPTED and session.encryption_state == session.EncryptionState.FULL_RSA_ENCRYPTED and session.public_rsa_key and not unencrypted:
             await socket.send(RSACipher(False).encrypt(data, session.public_rsa_key))
             return
 
@@ -164,8 +164,8 @@ class EncyptionState:
     UNENCRYPTED = 0
     INCOMING_RSA_ENCRYPTED = 1
     FULL_RSA_ENCRYPTED = 2
-    AES_ENCRYPTED = 3
-    AES_EXPIRED = 4
+    AES_EXPIRED = 3
+    AES_ENCRYPTED = 4
 
 class SocketSession:
     State = SocketState
@@ -178,7 +178,11 @@ class SocketSession:
         self.id: str = None
         self.address: Tuple[str, int] = None
         self.public_rsa_key: str = None
-        self.aes_key: str = None   
+        self.aes_key: str = None
+
+        self.user_id: str = None
+        self.user_token: str = None
+        self.authorized: bool = False
 
 class AddressAlreadyBoundError(Exception):
     pass

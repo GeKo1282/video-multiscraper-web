@@ -2,6 +2,7 @@ import json, os, base64
 from typing import List, Optional, AnyStr, Tuple, Any, Literal, Union, Callable, Dict
 from pathlib import Path
 from threading import Thread
+from datetime import datetime
 from scripts.helper.http import WebServer
 from scripts.helper.socket import WebSocketServer, WebSocketClientProtocol, websockets, SocketSession
 from scripts.webserver import WebExtender
@@ -9,6 +10,7 @@ from scripts.api import APIExtender
 from scripts.helper.logger import Fore, Color
 from scripts.helper.cipher import RSACipher, AESCipher
 from scripts.helper.util import generate_id
+from scripts.helper.database import Database
 
 class ProgramController:
     def __init__(self, prepare: bool = False):
@@ -19,6 +21,8 @@ class ProgramController:
 
         self.settings: dict = {}
         self.websocket_sessions: Dict[WebSocketClientProtocol, SocketSession] = {}
+
+        self.database: Database = Database("data/database.db")
 
         self.default_settings = {
             "rsa": {
@@ -55,6 +59,19 @@ class ProgramController:
         host = self.settings['socketserver']['host'] if self.settings['socketserver']['host'] != self.settings['webserver']['host'] and not self.settings['socketserver']['host'] == "0.0.0.0" else ""
         self.webserver.add_path("/", ["POST"], APIExtender(socket_host=host, socket_port=self.settings['socketserver']['port'], public_rsa_key=self.rsa.public_key()))
         self.webserver.extend(WebExtender())
+
+        self.database.create_table("users", [
+            "id TEXT PRIMARY KEY UNIQUE NOT NULL",
+            "email TEXT NOT NULL UNIQUE",
+            "username TEXT NOT NULL",
+            "displayname TEXT NOT NULL",
+            "password TEXT NOT NULL",
+            "token TEXT NOT NULL",
+            "settings TEXT NOT NULL DEFAULT '{}'",
+            "image BLOB",
+            "last_login DATETIME NOT NULL",
+            "created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+        ])
 
     def load_settings(self, settings_path: str = "data/settings.json") -> dict:
         # Loads, checks if valid and corrects settings if necessary
@@ -147,10 +164,20 @@ class ProgramController:
         class CouldNotLoadData(Exception):
             pass
 
-        async def send_error(error: str, code: int = 400):
+        async def send_error(error: str, code: int = 0, action: str = None, additional: dict = None):
+            # Codes table:
+            # 0: Unknown / not specified error
+            # 1-100: Reserved
+            # 101-200: Login / register / authorization errors:
+            #     101-110: Register errors
+            #     111-120: Login errors
+            #         111: Invalid credentials
+
             await WebSocketServer.send(websocket, {
                 "error": error,
-                "code": code
+                "code": code,
+                **({"action": action} if action else {}),
+                **(additional or {})
             }, session)
 
         async def decrypt(data: bytes, session: SocketSession) -> dict:
@@ -218,7 +245,16 @@ class ProgramController:
                 }, session)
                 continue
 
+            if not data.get('data'):
+                await send_error("Invalid data!")
+                print(f"Received invalid data: {data}")
+                continue
+
             if data.get('action') == 'send-rsa-key':
+                if not data['data'].get('key'):
+                    await send_error("Invalid data.", action=data.get('action'))
+                    continue
+
                 session.public_rsa_key = data['data']['key']
                 session.state = SocketSession.State.ENCRYPTED
                 session.encryption_state = SocketSession.EncryptionState.FULL_RSA_ENCRYPTED
@@ -229,6 +265,10 @@ class ProgramController:
                 continue
 
             if data.get('action') == 'send-aes-key':
+                if not data['data'].get('key'):
+                    await send_error("Invalid data.", action=data.get('action'))
+                    continue
+
                 session.aes_key = data['data']['key']
                 session.state = SocketSession.State.ENCRYPTED
                 session.encryption_state = SocketSession.EncryptionState.AES_ENCRYPTED
@@ -237,6 +277,32 @@ class ProgramController:
                     "success": True
                 }, session, rsa_only=True)
                 continue
+
+            if data.get('action') == 'login':
+                if not data['data'].get('username') or not data['data'].get('password'):
+                    await send_error("Invalid data.", action=data.get('action'))
+                    continue
+
+                user = self.database.select("users", ["id", "password", "token"], ("username = ?" if not "@" in data['data']['username'] else "email = ?"), [data['data']['username']])
+                if not user or not user[0][1] == data['data']['password']:
+                    await send_error("Invalid credentials.", code=111, action=data.get('action'), additional={
+                        "success": False
+                    })
+                    continue
+
+                session.user_id = user[0][0]
+                session.user_token = user[0][2]
+                session.authorized = True
+                session.state = SocketSession.State.AUTHORIZED
+                self.database.update("users", ["last_login"], [datetime.now()], "id = ?", [session.user_id])
+                await WebSocketServer.send(websocket, {
+                    "action": "login",
+                    "data": {"token": user[0][2]},
+                    "success": True
+                }, session)
+
+                continue
+                
 
             print(f"Received: {data}")
 

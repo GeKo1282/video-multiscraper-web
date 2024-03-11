@@ -2,6 +2,10 @@
     --body-background: rgb(20, 20, 20);
     --body-background-border-color: 38, 38, 38;
 
+    --window-background: rgb(29, 29, 28);
+    --window-border: 1px solid rgb(48, 48, 48);
+    --window-shadow: rgb(48, 48, 48);
+    
     --background-color: 29, 29, 28;
     --light-background-color: 40, 40, 40;
     --dark-background-color: 20, 20, 20;

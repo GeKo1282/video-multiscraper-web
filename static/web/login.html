@@ -17,11 +17,11 @@
 
     <script src="script/helper/util.js"></script>
     <script src="script/helper/root.js"></script>
-    <script src="script/login.js"></script>
+    <script src="script/login.js" defer></script>
 </head>
 <body>
     <div id="app-layer" class="layer">
-        <div class="window border" id="login-window">
+        <div class="window border animate shown" id="login-window">
             <div class="header-block">
                 <div class="top">Header line 1</div>
                 <div class="bottom">Header line 2 longer one</div>
@@ -43,12 +43,12 @@
             </div>
 
             <div class="section horizontal buttons-panel">
-                <div class="button button-style" id="login-button">Log In!</div>
+                <div class="button button-style" id="login-button" onclick="login()">Log In!</div>
                 <div class="button button-style" id="register-button" onclick="switch_window('register-window')">Register</div>
             </div>
         </div>
     
-        <div class="window border shown" id="register-window">
+        <div class="window border animate" id="register-window">
             <div class="back-button-box button" onclick="switch_window('login-window')">
                 <div class="label">Back</div>
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 16 16">
@@ -90,7 +90,7 @@
             </div>
         </div>
     
-        <div class="window border" id="forgotten-password-window">
+        <div class="window border animate" id="forgotten-password-window">
             <div class="back-button-box button" onclick="switch_window('login-window')">
                 <div class="label">Back</div>
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 16 16">

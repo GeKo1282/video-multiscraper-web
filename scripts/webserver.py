@@ -10,7 +10,9 @@ class WebExtender(Extender):
             ("/script/<path:path>", ["GET"], self.script),
             ("/style/<path:path>", ["GET"], self.style),
             ("/media/<path:path>", ["GET"], self.media),
-            ("/<path:path>", ["GET"], self.page)
+            ("/login", ["GET"], self.login),
+            ("/", ["GET"], self.app),
+            ("/<path:path>", ["GET"], self.app),
         ]
 
     def script(self, path: str) -> Response:
@@ -21,6 +23,12 @@ class WebExtender(Extender):
     
     def media(self, path: str) -> Response:
         return send_from_directory(str(Path("static/web/media").absolute()), path)
+    
+    def login(self) -> Response:
+        return send_from_directory(str(Path("static/web/").absolute()), "login.html")
+    
+    def app(self, *args, **kwargs) -> Response:
+        return send_from_directory(str(Path("static/web/").absolute()), "index.html")
     
     def page(self, path: str) -> Response:
         exclude = ["scripts/", "styles/", "media/"]
