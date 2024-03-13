@@ -34,6 +34,8 @@
 
     position: relative;
     transition: var(--transition-time) ease;
+
+    user-select: none;
 }
 
 #app-topbar .profile-box:not(:has(.profile-scrolldown:hover)):hover {
@@ -48,6 +50,7 @@
     transform: translateX(-50%);
 
     z-index: 1;
+    opacity: 1;
 
     display: flex;
     align-items: center;
@@ -61,6 +64,13 @@
     background: var(--window-background);
     border: var(--window-border);
     box-shadow: 0 0 10px 0 var(--window-shadow);
+
+    transition: var(--transition-time) ease;
+}
+
+#app-topbar .profile-scrolldown:not(.shown) {
+    opacity: 0;
+    pointer-events: none;
 }
 
 #app-topbar .profile-scrolldown .entry:not(.hidden) {
