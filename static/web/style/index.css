@@ -36,7 +36,7 @@
     transition: var(--transition-time) ease;
 }
 
-#app-topbar .profile-box:not(.profile-box .profile-scrolldown:hover):hover {
+#app-topbar .profile-box:not(:has(.profile-scrolldown:hover)):hover {
     background: rgba(var(--primary-color), 0.2);
     cursor: pointer;
 }
@@ -61,4 +61,42 @@
     background: var(--window-background);
     border: var(--window-border);
     box-shadow: 0 0 10px 0 var(--window-shadow);
+}
+
+#app-topbar .profile-scrolldown .entry:not(.hidden) {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    text-wrap: nowrap;
+    transition: var(--transition-time) ease;
+}
+
+#app-topbar .profile-scrolldown .entry.logout {
+    color: red;
+}
+
+#app-topbar .profile-scrolldown .entry:hover {
+    background: rgba(var(--primary-color), 0.2);
+    cursor: pointer;
+}
+
+#app-topbar .profile-details {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+#app-topbar .profile-image {
+    height: 80%;
+    aspect-ratio: 1;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    border-radius: 50%;
 }
