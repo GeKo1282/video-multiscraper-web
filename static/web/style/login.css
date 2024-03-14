@@ -1,9 +1,17 @@
-#app-layer > .window {
+:is(#app-layer, #floating-layer) > .content {
+    max-height: 85% !important;
+}
+
+#app-layer .content-background > .window {
     min-width: 600px;
     min-height: 300px;
 }
 
-#app-layer > .window > .header-block {
+#app-layer .content-background > .window {
+    padding: 35px 20px;
+}
+
+#app-layer .content-background > .window > .header-block {
     width: 100%;
     display: flex;
     align-items: center;
@@ -14,11 +22,11 @@
     margin-bottom: 40px;
 }
 
-#app-layer > .window > .header-block > .top {
+#app-layer .content-background > .window > .header-block > .top {
     font-size: 64px;
 }
 
-#app-layer > .window > .section {
+#app-layer .content-background > .window > .section {
     width: 100%;
     display: flex;
     align-items: center;
@@ -27,11 +35,11 @@
     gap: 40px;
 }
 
-#app-layer > .window > .section.horizontal {
+#app-layer .content-background > .window > .section.horizontal {
     flex-direction: row;
 }
 
-#app-layer > .window .input-block {
+#app-layer .content-background > .window .input-block {
     width: 100%;
     display: flex;
     align-items: start;
@@ -40,11 +48,11 @@
     gap: 10px;
 }
 
-#app-layer > .window .input-block > .label {
+#app-layer .content-background > .window .input-block > .label {
     font-size: 24px;
 }
 
-#app-layer > .window .input-block > input {
+#app-layer .content-background > .window .input-block > input {
     width: 100%;
     font-size: 24px;
 
@@ -55,17 +63,17 @@
     transition: 500ms border ease, 1s box-shadow ease;
 }
 
-#app-layer > .window .input-block > input:not(.invalid):not(.valid) {
+#app-layer .content-background > .window .input-block > input:not(.invalid):not(.valid) {
     border: 3px solid rgba(var(--primary-color), .5);
     box-shadow: 0 0 10px rgba(var(--primary-color), .8);
 }
 
-#app-layer > .window .input-block > input:not(.invalid):not(.valid):focus {
+#app-layer .content-background > .window .input-block > input:not(.invalid):not(.valid):focus {
     border: 3px solid rgba(var(--primary-color), .6);
     box-shadow: 0 0 15px rgba(var(--primary-color), .9);
 }
 
-#app-layer > .window .buttons-panel {
+#app-layer .content-background > .window .buttons-panel {
     align-self: center;
     width: 100%;
     display: flex;
@@ -75,16 +83,22 @@
     margin-top: 60px;
 }
 
-#app-layer > .window .back-button-box {
+#app-layer .content-background > .window .back-button-box {
     height: 32px;
     font-size: 32px;
 
     display: flex;
     gap: 10px;
     flex-direction: row-reverse;
+    justify-content: start;
     align-items: center;
     margin-left: -10px;
     margin-top: -10px;
+}
+
+#register-window .grid {
+    gap: 20px;
+    font-size: 24px;
 }
 
 .icon {

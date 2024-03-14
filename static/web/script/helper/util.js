@@ -29,6 +29,30 @@ global.standard_validators = {
         }
 
         return value.length >= 8 && value.length <= 64;
+    },
+    'displayname': (value) => {
+        return value.length >= 4 && value.length <= 64;
+    }
+}
+
+global.icons = {
+    x: {
+        type: "svg",
+        path: [
+            ["M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"],
+        ]
+    },
+    check: {
+        type: "svg",
+        path: [
+            ["M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"]
+        ]
+    },
+    question: {
+        type: "svg",
+        path: [
+            ["M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94"]
+        ]
     }
 }
 
@@ -168,5 +192,18 @@ async function initialize_websocket_communications(regular_handler, authorizatio
 
     while (!global.websocket.ready) {
         await sleep(50);
+    }
+}
+
+function place_icons() {
+    let icons = document.getElementsByClassName('icon');
+    for (let icon of icons) {
+        let icon_name = icon.dataset.icon;
+
+        if (!Object.keys(global.icons).includes(icon_name)) {
+            continue;
+        }
+
+        
     }
 }

@@ -19,99 +19,188 @@
     <script src="script/helper/root.js"></script>
     <script src="script/login.js" defer></script>
 </head>
-<body>
+<body class="login-page">
     <div id="app-layer" class="layer">
-        <div class="window border animate shown" id="login-window">
-            <div class="header-block">
-                <div class="top">Header line 1</div>
-                <div class="bottom">Header line 2 longer one</div>
-            </div>
-
-            <div class="warning hidden"></div>
-
-            <div class="section">
-                <div class="input-block">
-                    <div class="label">Username / E-mail</div>
-                    <input type="text" class="input validate" id="login-username-input" placeholder=""
-                    data-validator-standard="username|email">
-                </div>
-    
-                <div class="input-block">
-                    <div class="label">Password</div>
-                    <input type="password" class="input validate" id="login-password-input" placeholder="" data-validator-standard="password">
-                </div>
-            </div>
-
-            <div class="section horizontal buttons-panel">
-                <div class="button button-style" id="login-button" onclick="login()">Log In!</div>
-                <div class="button button-style" id="register-button" onclick="switch_window('register-window')">Register</div>
-            </div>
-        </div>
-    
-        <div class="window border animate" id="register-window">
-            <div class="back-button-box button" onclick="switch_window('login-window')">
-                <div class="label">Back</div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
-                </svg>
-            </div>
-
-            <div class="header-block">
-                <div class="top">Header line 1</div>
-                <div class="bottom">Header line 2 longer one</div>
-            </div>
-
-            <div class="warning hidden"></div>
+        <div class="content">
+            <div class="content-background">
+                <div class="window border animate shown" id="login-window">
+                    <div class="header-block">
+                        <div class="top">Header line 1</div>
+                        <div class="bottom">Header line 2 longer one</div>
+                    </div>
+        
+                    <div class="warning hidden"></div>
+        
+                    <div class="section">
+                        <div class="input-block">
+                            <div class="label">Username / E-mail</div>
+                            <input type="text" class="input validate" id="login-username-input" placeholder="" data-validator-standard="username|email">
+                        </div>
             
-            <div class="section">
-                <div class="input-block">
-                    <div class="label">Username</div>
-                    <input type="text" class="input" id="register-username-input" placeholder="" data-validator-standard="username">
+                        <div class="input-block">
+                            <div class="label">Password</div>
+                            <input type="password" class="input validate" id="login-password-input" placeholder="" data-validator-standard="password">
+                        </div>
+                    </div>
+        
+                    <div class="section horizontal buttons-panel">
+                        <div class="button button-style" id="login-button" onclick="login()">Log In!</div>
+                        <div class="button button-style" id="register-button" onclick="switch_window('register-window')">Register</div>
+                    </div>
                 </div>
-    
-                <div class="input-block">
-                    <div class="label">E-mail</div>
-                    <input type="text" class="input" id="register-email-input" placeholder="" data-validator-standard="email">
+            
+                <div class="window border animate" id="register-window">
+                    <div class="back-button-box button" onclick="switch_window('login-window')">
+                        <div class="label">Back</div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
+                        </svg>
+                    </div>
+        
+                    <div class="header-block">
+                        <div class="top">Header line 1</div>
+                        <div class="bottom">Header line 2 longer one</div>
+                    </div>
+        
+                    <div class="warning hidden"></div>
+                    
+                    <div class="section">
+                        <div class="input-block">
+                            <div class="label">Username</div>
+                            <input type="text" class="input validate" id="register-username-input" placeholder="" data-validator-standard="username">
+                        </div>
+
+                        <div class="input-block">
+                            <div class="label">Displayname</div>
+                            <input type="text" class="input validate" id="register-displayname-input" placeholder="" data-validator-standard="displayname">
+                        </div>
+            
+                        <div class="input-block">
+                            <div class="label">E-mail</div>
+                            <input type="text" class="input validate" id="register-email-input" placeholder="" data-validator-standard="email">
+                        </div>
+            
+                        <div class="input-block">
+                            <div class="label">Password</div>
+                            <input type="password" class="input validate" id="register-password-input" placeholder="" data-validator-standard="password">
+        
+                            <div class="grid grid-col-2">
+                                <div class="full-width">
+                                    Password must contain:
+                                </div>
+        
+                                <div class="req-8">
+                                    <div class="icons">
+                                        <div class="icon" data-icon="x"></div>
+                                        <div class="icon hidden" data-icon="check"></div>
+                                    </div>
+                                    <div class="label">
+                                        at least 8 characters
+                                    </div>
+                                </div>
+        
+                                <div class="req-max-64">
+                                    <div class="icons">
+                                        <div class="icon hidden" data-icon="x"></div>
+                                        <div class="icon" data-icon="check"></div>
+                                    </div>
+                                    <div class="label">
+                                        at most 64 characters
+                                    </div>
+                                </div>
+        
+                                <div class="req-num">
+                                    <div class="icons">
+                                        <div class="icon" data-icon="x"></div>
+                                        <div class="icon hidden" data-icon="check"></div>
+                                    </div>
+                                    <div class="label">
+                                        at least 1 number
+                                    </div>
+                                </div>
+        
+                                <div class="req-upper">
+                                    <div class="icons">
+                                        <div class="icon" data-icon="x"></div>
+                                        <div class="icon hidden" data-icon="check"></div>
+                                    </div>
+                                    <div class="label">
+                                        at least 1 uppercase letter
+                                    </div>
+                                </div>
+        
+                                <div class="req-lower">
+                                    <div class="icons">
+                                        <div class="icon" data-icon="x"></div>
+                                        <div class="icon hidden" data-icon="check"></div>
+                                    </div>
+                                    <div class="label">
+                                        at least 1 lowercase letter
+                                    </div>
+                                </div> 
+        
+                                <div class="req-special">
+                                    <div class="icons">
+                                        <div class="icon" data-icon="question"></div>
+                                        <div class="icon hidden" data-icon="check"></div>
+                                    </div>
+                                    <div class="label">
+                                        at least 1 special character*
+                                    </div>
+                                </div>
+                                
+                                <div class="req-chars full-width">
+                                    <div class="icons">
+                                        <div class="icon hidden" data-icon="x"></div>
+                                        <div class="icon" data-icon="check"></div>
+                                    </div>
+
+                                    <div class="label">
+                                        only following characters:
+                                        <br>
+                                        <div class="code-block" style="max-width: 600px; word-wrap: break-word;">
+                                            abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_!@#$%^&*()-+=[]{}|;:,.&lt>?
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+            
+                        <div class="input-block">
+                            <div class="label">Repeat Password</div>
+                            <input type="password" class="input validate" id="register-password-repeat-input" placeholder="" data-validator-linked="register-password-input">
+                        </div>
+                    </div>
+        
+                    <div class="section horizontal buttons-panel">
+                        <div class="button button-style" id="register-button">Register!</div>
+                    </div>
                 </div>
-    
-                <div class="input-block">
-                    <div class="label">Password</div>
-                    <input type="password" class="input" id="register-password-input" placeholder="" data-validator-standard="password">
+            
+                <div class="window border animate" id="forgotten-password-window">
+                    <div class="back-button-box button" onclick="switch_window('login-window')">
+                        <div class="label">Back</div>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
+                        </svg>
+                    </div>
+        
+                    <div class="header-block">
+                        <div class="top">Header line 1</div>
+                        <div class="bottom">Header line 2 longer one</div>
+                    </div>
+        
+                    <div class="warning hidden"></div>
+        
+                    <div class="section vertical">
+                        <div class="label">E-mail</div>
+                        <input type="text" class="input" id="forgotten-password-email-input" placeholder="">
+                    </div>
+        
+                    <div class="section horizontal">
+                        <div class="button button-style" id="forgotten-password-button">Reset my password!</div>
+                    </div>
                 </div>
-    
-                <div class="input-block">
-                    <div class="label">Repeat Password</div>
-                    <input type="password" class="input" id="register-password-repeat-input" placeholder="" data-validator-linked="register-password-input">
-                </div>
-            </div>
-
-            <div class="section horizontal buttons-panel">
-                <div class="button button-style" id="register-button">Register!</div>
-            </div>
-        </div>
-    
-        <div class="window border animate" id="forgotten-password-window">
-            <div class="back-button-box button" onclick="switch_window('login-window')">
-                <div class="label">Back</div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/>
-                </svg>
-            </div>
-
-            <div class="header-block">
-                <div class="top">Header line 1</div>
-                <div class="bottom">Header line 2 longer one</div>
-            </div>
-
-            <div class="warning hidden"></div>
-
-            <div class="section vertical">
-                <div class="label">E-mail</div>
-                <input type="text" class="input" id="forgotten-password-email-input" placeholder="">
-            </div>
-
-            <div class="section horizontal">
-                <div class="button button-style" id="forgotten-password-button">Reset my password!</div>
             </div>
         </div>
     </div>
