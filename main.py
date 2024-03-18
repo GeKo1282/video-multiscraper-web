@@ -9,7 +9,7 @@ from scripts.webserver import WebExtender
 from scripts.api import APIExtender
 from scripts.helper.logger import Fore, Color
 from scripts.helper.cipher import RSACipher, AESCipher
-from scripts.helper.util import generate_id
+from scripts.helper.util import generate_id, sha512
 from scripts.helper.database import Database
 
 class ProgramController:
@@ -62,15 +62,19 @@ class ProgramController:
 
         self.database.create_table("users", [
             "id TEXT PRIMARY KEY UNIQUE NOT NULL",
-            "email TEXT NOT NULL UNIQUE",
             "username TEXT NOT NULL",
+            "email TEXT NOT NULL UNIQUE",
             "displayname TEXT NOT NULL",
             "password TEXT NOT NULL",
+            "salt TEXT NOT NULL",
             "token TEXT NOT NULL",
             "settings TEXT NOT NULL DEFAULT '{}'",
             "image BLOB",
             "last_login DATETIME NOT NULL",
             "created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            "confirmed BOOLEAN NOT NULL DEFAULT FALSE",
+            "deleted BOOLEAN NOT NULL DEFAULT FALSE",
+            "suspended BOOLEAN NOT NULL DEFAULT FALSE"
         ])
 
     def load_settings(self, settings_path: str = "data/settings.json") -> dict:
@@ -226,14 +230,7 @@ class ProgramController:
                 data: Union[dict, str] = await decrypt(await websocket.recv(), session)
             except (websockets.exceptions.ConnectionClosedError, websockets.exceptions.ConnectionClosedOK):
                 break
-            except CouldNotLoadData:
-                continue
-
-            if type(data) != dict:
-                data = {
-                    "nondict": data
-                }
-
+            except CouldNotLoadData:"id = ?, email = ?, username = ?, displayname = ?, password = ?, token = ?, settings = ?, image = ?, last_login = ?, confirmed = ?, deleted = ?, suspended = ?",
             if data.get('action') == 'get-rsa-key':
                 session.state = SocketSession.State.ENCRYPTED
                 session.encryption_state = SocketSession.EncryptionState.INCOMING_RSA_ENCRYPTED
@@ -278,7 +275,26 @@ class ProgramController:
                 }, session, rsa_only=True)
                 continue
 
-            if data.get('action') == 'login':
+            if data.get('action') == 'get-salt':
+                username = data['data'].get('username')
+                if not username:
+                    await send_error("Invalid data.", action=data.get('action'))
+                    continue
+
+                user = self.database.select("users", ["salt"], ("username = ?" if not "@" in username else "email = ?"), [username])
+                if not user:
+                    await send_error("User not found.", action=data.get('action'))
+                    continue
+
+                await WebSocketServer.send(websocket, {
+                    "action": "get-salt",
+                    "data": {
+                        "salt": user[0][0]
+                    },
+                    "success": True
+                }, session)
+
+            if data.get('action') == 'get-user-auth':
                 if not data['data'].get('username') or not data['data'].get('password'):
                     await send_error("Invalid data.", action=data.get('action'))
                     continue
@@ -290,19 +306,70 @@ class ProgramController:
                     })
                     continue
 
-                session.user_id = user[0][0]
-                session.user_token = user[0][2]
-                session.authorized = True
-                session.state = SocketSession.State.AUTHORIZED
-                self.database.update("users", ["last_login"], [datetime.now()], "id = ?", [session.user_id])
                 await WebSocketServer.send(websocket, {
-                    "action": "login",
-                    "data": {"token": user[0][2]},
+                    "action": "get-user-auth",
+                    "data": {
+                        "id": user[0][0],
+                        "token": user[0][2]
+                    },
                     "success": True
                 }, session)
 
                 continue
+
+            if data.get('action') == 'login':
+                user_id, token = data['data'].get('id'), data['data'].get('token')
+
+                if not user_id or not token:
+                    await send_error("Invalid data.", action=data.get('action'))
+                    continue
+
+                user = self.database.select("users", ["id"], "id = ? AND token = ?", [user_id, token])
+                if not user:
+                    await send_error("Invalid credentials.", code=111, action=data.get('action'), additional={
+                        "success": False
+                    })
+                    continue
+
+                await WebSocketServer.send(websocket, {
+                    "action": "login",
+                    "success": True
+                }, session)
                 
+            if data.get('action') == 'register':
+                username, displayname, email, password, salt = \
+                (data['data'].get('username'),
+                data['data'].get('displayname'),
+                data['data'].get('email'),
+                data['data'].get('password'),
+                data['data'].get('salt'))
+
+                if not username or not displayname or not email or not password:
+                    await send_error("Invalid data.", action=data.get('action'))
+                    continue
+
+                if self.database.select("users", ["id"], "username = ? OR email = ?", [username, email]):
+                    await send_error("Username or email already in use.", code=101, action=data.get('action'),
+                    additional={
+                        "success": False
+                    })
+                    continue
+
+                user_id = generate_id(avoid=[x[0] for x in self.database.select("users", ["id"])])
+                user_token = hex(int(datetime.now().timestamp()))[2:] + sha512(user_id)[:24] + generate_id(length=32, type="hex")
+
+                self.database.insert("users",
+                ["id", "email", "username", "displayname", "password", "salt", "token", "settings", "image", "last_login", "confirmed", "deleted", "suspended"],
+                [user_id, email, username, displayname, password, salt, user_token, "{}", None, datetime.now(), True, False, False])
+
+                await WebSocketServer.send(websocket, {
+                    "action": "register",
+                    "data": {
+                        "id": user_id,
+                        "token": user_token
+                    },
+                    "success": True
+                }, session)
 
             print(f"Received: {data}")
 

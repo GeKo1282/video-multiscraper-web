@@ -1,15 +1,34 @@
 import random
 from typing import Union, Literal, List
+from hashlib import sha512 as nonsalt_sha512
 
-def generate_id(length: int = 16, type: Union[Literal["int"], Literal["str"]] = "str", *, charset: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", avoid: List[Union[str, int]] = None) -> Union[str, int]:
+def generate_id(length: int = 16, type: Union[Literal["int"], Literal["str"], Literal["hex"]] = "str", *, charset: Union[str, List[str]] = None, avoid: List[Union[str, int]] = None) -> Union[str, int]:
     if type == "int":
         new = random.randint(10 ** (length - 1), 10 ** length - 1)
         while avoid and new in avoid:
             new = random.randint(10 ** (length - 1), 10 ** length - 1)
         return new
     
+    if not charset:
+        if type == "hex":
+            charset = "0123456789abcdef"
+        else:
+            charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
     new = "".join([random.choice(charset) for _ in range(length)])
     while avoid and new in avoid:
         new = "".join([random.choice(charset) for _ in range(length)])
 
     return new
+
+def sha512(data: Union[str, bytes], salt: Union[str, bytes] = None) -> str:
+    if isinstance(data, str):
+        data = data.encode()
+        
+    if salt and isinstance(salt, str):
+        salt = salt.encode()
+
+    if salt:
+        return nonsalt_sha512((data + salt)).hexdigest()
+    
+    return nonsalt_sha512(data).hexdigest()

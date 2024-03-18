@@ -30,6 +30,14 @@ global.standard_validators = {
 
         return value.length >= 8 && value.length <= 64;
     },
+    'password-create': (value) => {
+        let checks = [value.length >= 8, value.length <= 64,
+        any(Array.from(value).map((character) => character.match(/[0-9]/))),
+        any(Array.from(value).map((character) => character.match(/[A-Z]/))),
+        any(Array.from(value).map((character) => character.match(/[a-z]/))),
+        Boolean(value.match(/^[A-Za-z0-9_\!\@\#\$\%\^\&\*\(\)-+=\[\]{}\|;:,.<>\?]+$/))];
+        return all(checks);
+    },
     'displayname': (value) => {
         return value.length >= 4 && value.length <= 64;
     }
@@ -220,6 +228,36 @@ function place_icons() {
             icon.appendChild(svg);
         }       
     }
+}
+
+function any(iterable) {
+    for (let element of iterable) {
+        if (element) return true;
+    }
+    return false;
+}
+
+function all(iterable) {
+    for (let element of iterable) {
+        if (!element) return false;
+    }
+    return true;
+}
+
+function sha512(string, salt) {
+    let hash = forge.md.sha512.create();
+    if (salt) hash.update(salt);
+    hash.update(string);
+    return hash.digest().toHex();
+}
+
+function generate_string(length) {
+    let result = '';
+    let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
 }
 
 addLoadEvent(() => {

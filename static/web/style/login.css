@@ -98,8 +98,9 @@
 }
 
 #register-window .grid {
-    row-gap: 10px;
+    row-gap: 15px;
     font-size: 24px;
+    width: 100%;
 }
 
 #password-requirements .req-block {
@@ -126,8 +127,12 @@
     width: 100%;
 }
 
-#password-requirements .req-block:not(.fulfilled) {
+#password-requirements .req-block:not(.req-special):not(.fulfilled) {
     color: rgba(var(--error-color));
+}
+
+#password-requirements .req-block.req-special:not(.fulfilled) {
+    color: rgba(var(--warning-color));
 }
 
 #password-requirements .req-block:not(.fulfilled) .icon.fulfilled {
@@ -179,6 +184,12 @@
 .input-block input.valid:focus {
     border: 3px solid rgba(var(--success-color), .3);
     box-shadow: 0 0 15px rgba(var(--success-color), .5);
+}
+
+.back-button-box .icon {
+    height: 100%;
+    aspect-ratio: 1;
+    fill: currentColor;
 }
 
 @keyframes shake-vertical {

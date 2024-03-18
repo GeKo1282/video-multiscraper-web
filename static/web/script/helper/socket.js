@@ -203,4 +203,8 @@ class WebSocketClient {
     get ready() {
         return this.#ready;
     }
+
+    get full_encryption() {
+        return this.#server_rsa_key && this.#ready;
+    }
 }

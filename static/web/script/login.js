@@ -7,7 +7,7 @@ global.requirements = {
     "req-8": (value) => {
         return value.length >= 8;
     },
-    "req-64": (value) => {
+    "req-max-64": (value) => {
         return value.length <= 64;
     },
     "req-num": (value) => {
@@ -23,7 +23,7 @@ global.requirements = {
         return value.match(/[_\!\@\#\$\%\^\&\*\(\)-+=\[\]{}\|;:,.<>\?]/);
     },
     "req-chars": (value) => {
-        return value.match(/^[A-Za-z0-9_\!\@\#\$\%\^\&\*\(\)-+=\[\]{}\|;:,.<>\?]$/);
+        return value.match(/^[A-Za-z0-9_\!\@\#\$\%\^\&\*\(\)-+=\[\]{}\|;:,.<>\?]+$/);
     }
 }
 
@@ -47,7 +47,7 @@ addLoadEvent(() => {
 
         let password = password_input.value;
     
-        for (let req of global.requirements) {
+        for (let req of Object.keys(global.requirements)) {
             if (global.requirements[req](password)) {
                 document.getElementById("password-requirements").getElementsByClassName(req)[0].classList.add('fulfilled');
             } else {
@@ -77,8 +77,7 @@ addLoadEvent(() => {
 });
 
 addLoadEvent(async () => {
-    // Get data about and connect to socket
-    await initialize_websocket_communications((decrypted, _message_object) => {
+    global.socket_hander = (decrypted, _message_object) => {
         decrypted = JSON.parse(decrypted);
 
         if (decrypted.action == 'login') {
@@ -91,27 +90,61 @@ addLoadEvent(async () => {
         }
 
         console.log(decrypted);
-    });
+    }
+
+    // Get data about and connect to socket
+    await initialize_websocket_communications(global.socket_hander);
 });
 
 async function login() {
     let username = document.getElementById('login-username-input').value;
     let password = document.getElementById('login-password-input').value;
 
-    
-    let md = forge.md.sha512.create();
-    md.update(password);
-    let password_hash = md.digest().toHex();
+    while (!global.websocket.ready || !global.websocket.full_encryption) {
+        await sleep(50);
+    }
 
-    while (!global.websocket.ready) {
+    global.websocket.onmessage = (decrypted, _) => {
+        if (decrypted.action != 'get-salt' || !decrypted.success) {
+            return;
+        }
+
+        global.websocket.onmessage = global.socket_hander;
+
+        global.websocket.send(JSON.stringify({
+            action: 'login',
+            data: {
+                username: username,
+                password: sha512(password, decrypted.data.salt)
+            }
+        }));
+    }
+}
+
+async function register() {
+    let salt = generate_string(32);
+
+    let data = {
+        username: document.getElementById('register-username-input').value,
+        displayname: document.getElementById('register-displayname-input').value,
+        email: document.getElementById('register-email-input').value,
+        password: sha512(document.getElementById('register-password-input').value, salt),
+        salt: salt
+    };
+
+    if (document.getElementById('register-password-input').value != document.getElementById('register-password-repeat-input').value) {
+        document.getElementById('register-password-input').value = '';
+        document.getElementById('register-password-repeat-input').value = '';
+        document.getElementById('register-password-input').oninput();
+        return;
+    }
+
+    while (!global.websocket.ready || !global.websocket.full_encryption) {
         await sleep(50);
     }
 
     global.websocket.send(JSON.stringify({
-        action: 'login',
-        data: {
-            username: username,
-            password: password_hash
-        }
+        action: 'register',
+        data: data
     }));
 }

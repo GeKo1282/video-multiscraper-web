@@ -36,6 +36,7 @@
 
     --error-color: 230, 10, 10;
     --success-color: 10, 230, 10;
+    --warning-color: 230, 180, 10;
 
     --button-color: var(--primary-color);
     --button-disabled-color: 100, 100, 100;
