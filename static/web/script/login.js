@@ -3,6 +3,30 @@ if (!window.global)
 
 global = window.global;
 
+global.requirements = {
+    "req-8": (value) => {
+        return value.length >= 8;
+    },
+    "req-64": (value) => {
+        return value.length <= 64;
+    },
+    "req-num": (value) => {
+        return value.match(/[0-9]/);
+    },
+    "req-upper": (value) => {
+        return value.match(/[A-Z]/);
+    },
+    "req-lower": (value) => {
+        return value.match(/[a-z]/);
+    },
+    "req-special": (value) => {
+        return value.match(/[_\!\@\#\$\%\^\&\*\(\)-+=\[\]{}\|;:,.<>\?]/);
+    },
+    "req-chars": (value) => {
+        return value.match(/^[A-Za-z0-9_\!\@\#\$\%\^\&\*\(\)-+=\[\]{}\|;:,.<>\?]$/);
+    }
+}
+
 addLoadEvent(() => {
     let username = (new URLSearchParams(window.location.search)).get('username');
 
@@ -11,6 +35,27 @@ addLoadEvent(() => {
         if (document.getElementById('login-password-input').oninput) document.getElementById('login-password-input').oninput();
     }
 });
+
+addLoadEvent(() => {
+    // Assign events to password validators on register page
+    let password_input = document.getElementById('register-password-input');
+
+    let oldoninput = password_input.oninput;
+
+    password_input.oninput = () => {
+        if (oldoninput) oldoninput();
+
+        let password = password_input.value;
+    
+        for (let req of global.requirements) {
+            if (global.requirements[req](password)) {
+                document.getElementById("password-requirements").getElementsByClassName(req)[0].classList.add('fulfilled');
+            } else {
+                document.getElementById("password-requirements").getElementsByClassName(req)[0].classList.remove('fulfilled');
+            }
+        }
+    }
+})
 
 addLoadEvent(() => {
     // Generate RSA keypair

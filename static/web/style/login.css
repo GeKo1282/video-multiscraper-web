@@ -98,14 +98,48 @@
 }
 
 #register-window .grid {
-    gap: 20px;
+    row-gap: 10px;
     font-size: 24px;
 }
 
-.icon {
+#password-requirements .req-block {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 16px;
+}
+
+#password-requirements .icons {
     height: 100%;
-    color: rgba(var(--font-color));
+}
+
+#password-requirements .icon {
+    display: block;
+    height: 100%;
+    aspect-ratio: 1;
     fill: currentColor;
+}
+
+#password-requirements svg {
+    height: 100%;
+    width: 100%;
+}
+
+#password-requirements .req-block:not(.fulfilled) {
+    color: rgba(var(--error-color));
+}
+
+#password-requirements .req-block:not(.fulfilled) .icon.fulfilled {
+    display: none;
+}
+
+#password-requirements .req-block.fulfilled {
+    color: rgba(var(--success-color));
+}
+
+#password-requirements .req-block.fulfilled .icon.unfulfilled {
+    display: none;
 }
 
 .button-style {
@@ -146,7 +180,6 @@
     border: 3px solid rgba(var(--success-color), .3);
     box-shadow: 0 0 15px rgba(var(--success-color), .5);
 }
-
 
 @keyframes shake-vertical {
     0% { transform: translateY(0px); }

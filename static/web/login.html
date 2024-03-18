@@ -23,7 +23,7 @@
     <div id="app-layer" class="layer">
         <div class="content">
             <div class="content-background">
-                <div class="window border animate shown" id="login-window">
+                <div class="window border animate" id="login-window">
                     <div class="header-block">
                         <div class="top">Header line 1</div>
                         <div class="bottom">Header line 2 longer one</div>
@@ -49,7 +49,7 @@
                     </div>
                 </div>
             
-                <div class="window border animate" id="register-window">
+                <div class="window border animate shown" id="register-window">
                     <div class="back-button-box button" onclick="switch_window('login-window')">
                         <div class="label">Back</div>
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 16 16">
@@ -84,83 +84,80 @@
                             <div class="label">Password</div>
                             <input type="password" class="input validate" id="register-password-input" placeholder="" data-validator-standard="password">
         
-                            <div class="grid grid-col-2">
+                            <div id="password-requirements" class="grid grid-col-2">
                                 <div class="full-width">
                                     Password must contain:
                                 </div>
         
-                                <div class="req-8">
+                                <div class="req-block req-8">
                                     <div class="icons">
-                                        <div class="icon" data-icon="x"></div>
-                                        <div class="icon hidden" data-icon="check"></div>
+                                        <div class="icon unfulfilled" data-icon="x"></div>
+                                        <div class="icon fulfilled" data-icon="check"></div>
                                     </div>
                                     <div class="label">
                                         at least 8 characters
                                     </div>
                                 </div>
         
-                                <div class="req-max-64">
+                                <div class="req-block req-max-64 fullfilled">
                                     <div class="icons">
-                                        <div class="icon hidden" data-icon="x"></div>
-                                        <div class="icon" data-icon="check"></div>
+                                        <div class="icon unfulfilled" data-icon="x"></div>
+                                        <div class="icon fulfilled" data-icon="check"></div>
                                     </div>
                                     <div class="label">
                                         at most 64 characters
                                     </div>
                                 </div>
         
-                                <div class="req-num">
+                                <div class="req-block req-num">
                                     <div class="icons">
-                                        <div class="icon" data-icon="x"></div>
-                                        <div class="icon hidden" data-icon="check"></div>
+                                        <div class="icon unfulfilled" data-icon="x"></div>
+                                        <div class="icon fulfilled" data-icon="check"></div>
                                     </div>
                                     <div class="label">
                                         at least 1 number
                                     </div>
                                 </div>
         
-                                <div class="req-upper">
+                                <div class="req-block req-upper">
                                     <div class="icons">
-                                        <div class="icon" data-icon="x"></div>
-                                        <div class="icon hidden" data-icon="check"></div>
+                                        <div class="icon unfulfilled" data-icon="x"></div>
+                                        <div class="icon fulfilled data-icon="check"></div>
                                     </div>
                                     <div class="label">
                                         at least 1 uppercase letter
                                     </div>
                                 </div>
         
-                                <div class="req-lower">
+                                <div class="req-block req-lower">
                                     <div class="icons">
-                                        <div class="icon" data-icon="x"></div>
-                                        <div class="icon hidden" data-icon="check"></div>
+                                        <div class="icon unfulfilled" data-icon="x"></div>
+                                        <div class="icon fulfilled" data-icon="check"></div>
                                     </div>
                                     <div class="label">
                                         at least 1 lowercase letter
                                     </div>
                                 </div> 
         
-                                <div class="req-special">
+                                <div class="req-block req-special">
                                     <div class="icons">
-                                        <div class="icon" data-icon="question"></div>
-                                        <div class="icon hidden" data-icon="check"></div>
+                                        <div class="icon unfulfilled" data-icon="question"></div>
+                                        <div class="icon fulfilled" data-icon="check"></div>
                                     </div>
                                     <div class="label">
                                         at least 1 special character*
                                     </div>
                                 </div>
                                 
-                                <div class="req-chars full-width">
+                                <div class="req-block req-chars full-width fulfilled">
                                     <div class="icons">
-                                        <div class="icon hidden" data-icon="x"></div>
-                                        <div class="icon" data-icon="check"></div>
+                                        <div class="icon unfulfilled" data-icon="x"></div>
+                                        <div class="icon fulfilled" data-icon="check"></div>
                                     </div>
 
-                                    <div class="label">
+                                    <div class="label" style="display: flex; flex-direction: column; gap: 10px;">
                                         only following characters:
-                                        <br>
-                                        <div class="code-block" style="max-width: 600px; word-wrap: break-word;">
-                                            abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_!@#$%^&*()-+=[]{}|;:,.&lt>?
-                                        </div>
+                                        <div><div class="code-block">a-z</div>,<div class="code-block">A-Z</div>,<div class="code-block">0-9</div>,<div class="code-block">_!@#$%^&*()-+=[]{}|;:,.&lt>?</div></div>
                                     </div>
                                 </div>
                             </div>

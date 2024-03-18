@@ -1,4 +1,4 @@
-import sqlite3
+import sqlite3, os
 from typing import List, Dict
 
 class Database:
@@ -8,7 +8,10 @@ class Database:
         self.tables: List[str] = self.get_tables()
         self.columns: Dict[str, List[str]] = {table: self.get_columns(table) for table in self.tables}
 
-    def connect(self) -> sqlite3.Connection:
+    def connect(self, makedirs: bool = True) -> sqlite3.Connection:
+        if makedirs:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        
         return sqlite3.connect(self.path)
     
     def create_table(self, table_name: str, columns: list, if_not_exists: bool = True) -> None:

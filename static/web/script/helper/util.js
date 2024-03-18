@@ -204,6 +204,24 @@ function place_icons() {
             continue;
         }
 
-        
+        if (global.icons[icon_name].type == "svg") {
+            let svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+
+            svg.setAttribute('viewBox', '0 0 16 16');
+            svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+            for (let path of global.icons[icon_name].path) {
+                let path_element = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path_element.setAttribute('d', path);
+                path_element.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                svg.appendChild(path_element);
+            }
+
+            icon.appendChild(svg);
+        }       
     }
 }
+
+addLoadEvent(() => {
+    place_icons();
+});
