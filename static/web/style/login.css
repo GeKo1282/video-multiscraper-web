@@ -9,6 +9,7 @@
 
 #app-layer .content-background > .window {
     padding: 35px 20px;
+    margin-top: 0 !important;
 }
 
 #app-layer .content-background > .window > .header-block {
