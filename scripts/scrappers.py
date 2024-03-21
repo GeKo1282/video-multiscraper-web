@@ -1,28 +1,33 @@
-import requests, json, bs4
+import asyncio, json, bs4
 from typing import Optional, List, Tuple, Union, Literal
 from datetime import datetime
 from urllib.parse import quote as urlquote, unquote as urlunquote
+from scripts.helper.requester import Requester
 
 class Service:
-    def __init__(self, *, default_agent: Optional[str] = None) -> None:
+    def __init__(self, *, requester: Requester = None) -> None:
         self.base_url: str = None
         self.homepage_url: str = None
         self.search_suggestions_url: str = None
 
         self.default_headers: dict = {}
-        self.default_agent: Optional[str] = default_agent
 
-    def get_search_suggestions(self, hint: str = None, limit: int = 10, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
+        self.requester: Requester = requester or Requester(default_headers={
+            "Referer": self.base_url,
+            "X-Requested-With": "XMLHttpRequest"
+        }, max_requests_per_minute=20, max_requests_per_second=20)
+
+    async def get_search_suggestions(self, hint: str = None, limit: int = 10, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
         '''
             This method is intended to be overwritten by devired classes.
         '''
 
-    def get_homepage_suggestions(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
+    async def get_homepage_suggestions(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
         '''
             This method is intended to be overwritten by devired classes.
         '''
 
-    def search(self, query: str, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[Union["Movie", "Series"]]:
+    async def search(self, query: str, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[Union["Movie", "Series"]]:
         '''
             This method is intended to be overwritten by devired classes.
         '''
@@ -42,7 +47,7 @@ class Service:
 class Movie:
     def __init__(self, url: str, title: str = None, thumbnail: str = None, description: str = None,
      genres: List[str] = None, release_year: int = None, duration: str = None, rating: float = None,
-     director: str = None, actors: List[str] = None, trailer_url: str = None, similar: List["Movie"] = None) -> None:
+     director: str = None, actors: List[str] = None, trailer_url: str = None, similar: List["Movie"] = None, *, requester: Requester = None) -> None:
         self.url: str = url
         self.is_scrapped: bool = False if not all([
             title, thumbnail, description, genres, release_year, duration, rating, director, actors, trailer_url
@@ -56,16 +61,20 @@ class Movie:
         self.duration: str = duration
         self.rating: float = rating
         self.director: str = director
-        self.actors: List[str] = actors or []
 
-        self.similar: List[Movie] = similar or []
+        self.similar: List[Union[Series, Movie]] = similar or []
 
-    def scrap(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> None:
+        self.requester: Requester = requester or Requester(default_headers={
+            "Referer": self.url.split("://")[0] + "://" + self.url.split("://")[1].split("/")[0] + "/",
+            "X-Requested-With": "XMLHttpRequest"
+        }, max_requests_per_minute=20, max_requests_per_second=20)
+
+    async def scrap(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> None:
         '''
             This method is intended to be overwritten by devired classes.
         '''
 
-    def get_sources(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
+    async def get_sources(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
         '''
             This method is intended to be overwritten by devired classes.
         '''
@@ -82,8 +91,7 @@ class Movie:
                 "duration": self.duration,
                 "rating": self.rating,
                 "director": self.director,
-                "actors": self.actors,
-                "similar": [movie.url for movie in self.similar]
+                "similar": [similar.url for similar in self.similar]
             }
         
         return f"URL: {self.url}\n" +\
@@ -101,7 +109,8 @@ class Movie:
 class Series:
     def __init__(self, url: str, title: str = None, thumbnail: str = None, description: str = None,
      genres: List[str] = None, release_time: Tuple[datetime, datetime] = None,
-     episodes: Union[dict[str, List["Episode"]], List["Episode"]] = None) -> None:
+     episodes: Union[dict[str, List["Episode"]], List["Episode"]] = None, 
+     similar: List[Union["Series", "Movie"]] = None, *, requester: Requester = None) -> None:
         self.url: str = url
         self.is_scrapped: bool = False if not all([
             title, thumbnail, description, genres, release_time, episodes
@@ -111,17 +120,23 @@ class Series:
         self.thumbnail: str = thumbnail
         self.description: str = description
         self.genres: List[str] = genres or []
-        self.release_time: Tuple[datetime, datetime] = release_time
+        self.release_time: Tuple[datetime, Optional[datetime]] = release_time
 
         self.episodes: Union[dict[str, List[Episode]], List[Episode]] = episodes or []
 
+        self.similar: List[Union[Series, Movie]] = similar or []
+        
+        self.requester: Requester = requester or Requester(default_headers={
+            "Referer": self.url.split("://")[0] + "://" + self.url.split("://")[1].split("/")[0] + "/",
+            "X-Requested-With": "XMLHttpRequest"
+        }, max_requests_per_minute=20, max_requests_per_second=20)
 
-    def scrap(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> None:
+    async def scrap(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> None:
         '''
             This method is intended to be overwritten by devired classes.
         '''
 
-    def get_sources(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
+    async def get_sources(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
         '''
             This method is intended to be overwritten by devired classes.
         '''
@@ -134,8 +149,9 @@ class Series:
                 "thumbnail": self.thumbnail,
                 "description": self.description,
                 "genres": self.genres,
-                "release_time": [self.release_time[0].timestamp(), self.release_time[1].timestamp()] if self.release_time else None,
-                "episodes": [episode.info() for episode in self.episodes]
+                "release_time": [int(self.release_time[0].timestamp()), (int(self.release_time[1].timestamp()) if self.release_time[1] else None)] if self.release_time else None,
+                "episodes": [episode.info() for episode in self.episodes],
+                "similar": [similar.url for similar in self.similar]
             }
         
         return f"URL: {self.url}\n" +\
@@ -148,7 +164,7 @@ class Series:
 
 class Episode:
     def __init__(self, url: str, title: str = None, thumbnail: str = None, release_date: datetime = None,
-        duration: str = None, description: str = None) -> None:
+        duration: str = None, description: str = None, *, requester: Requester = None) -> None:
         self.url: str = url
         self.is_scrapped: bool = False if not all([
             title, thumbnail, release_date, duration, description
@@ -159,13 +175,18 @@ class Episode:
         self.release_date: datetime = release_date
         self.duration: str = duration
         self.description: str = description
+
+        self.requester: Requester = requester or Requester(default_headers={
+            "Referer": self.url.split("://")[0] + "://" + self.url.split("://")[1].split("/")[0] + "/",
+            "X-Requested-With": "XMLHttpRequest"
+        }, max_requests_per_minute=20, max_requests_per_second=20)
         
-    def scrap(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> None:
+    async def scrap(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> None:
         '''
             This method is intended to be overwritten by devired classes.
         '''
 
-    def get_sources(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
+    async def get_sources(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
         '''
             This method is intended to be overwritten by devired classes.
         '''
@@ -189,35 +210,98 @@ class Episode:
             f"Description: {self.description}"
 
 class OA_Movie(Movie):
-    def __init__(self, url: str, id: int = None, *args, **kwargs) -> None:
+    def __init__(self, url: str, id: int = None, pegi: str = None, alternate_titles: List[str] = None,
+         tags: List['str'] = None, views: int = None, rating: float = None, length: int = None,
+         trailer_url: str = None, *args, **kwargs) -> None:
         super().__init__(url, *args, **kwargs)
 
         self.id: int = id
+        self.pegi: str = pegi
+        self.alternate_titles: List[str] = alternate_titles or []
+        self.tags: List[str] = tags or []
+        self.views: int = views
+        self.rating: float = rating
+        self.length: int = length
+        self.trailer_url: str = trailer_url
+
+    def info(self, type: Union[Literal['printable'], Literal['JSON']] = "JSON") -> dict:
+        if type.lower() == "json":
+            return {
+                **super().info("JSON"),
+                "id": self.id,
+                "type": "movie",
+                "pegi": self.pegi,
+                "alternate_titles": self.alternate_titles,
+                "tags": self.tags,
+                "views": self.views,
+                "rating": self.rating,
+                "length": self.length,
+                "trailer_url": self.trailer_url
+            }
+        
+        return super().info("printable") + f"ID: {self.id}"
 
 class OA_Series(Series):
-    def __init__(self, url: str, id: int = None, type: str = None, *args, **kwargs) -> None:
+    def __init__(self, url: str, id: int = None, series_type: str = None, pegi: str = None, alternate_titles: List[str] = None,
+         tags: List['str'] = None, views: int = None, rating: float = None, episode_count: int = None, episode_length: int = None,
+         trailer_url: str = None, status: str = None, *args, **kwargs) -> None:
         super().__init__(url, *args, **kwargs)
 
-        self.id: int = id
-        self.type: str = type
+        if any([not id, not series_type, not pegi, not views, not rating]):
+            self.is_scrapped = False
 
+        self.id: int = id
+        self.series_type: str = series_type
+        self.pegi: str = pegi
+        self.alternate_titles: List[str] = alternate_titles or []
+        self.tags: List[str] = tags or []
+        self.views: int = views
+        self.rating: float = rating
+        self.episode_count: int = episode_count
+        self.episode_length: int = episode_length
+        self.trailer_url: str = trailer_url
+        self.status: str = status
+
+    def info(self, type: Union[Literal['printable'], Literal['JSON']] = "JSON") -> dict:
+        if type.lower() == "json":
+            return {
+                **super().info("JSON"),
+                "id": self.id,
+                "series_type": self.series_type,
+                "type": "series",
+                "pegi": self.pegi,
+                "alternate_titles": self.alternate_titles,
+                "tags": self.tags,
+                "views": self.views,
+                "rating": self.rating,
+                "episodes": self.episodes,
+                "episode_length": self.episode_length,
+                "trailer_url": self.trailer_url,
+                "status": self.status
+            }
+        
+        return super().info("printable") + f"ID: {self.id}\n" +\
+         f"Type: {self.type}"
+    
 class OA_Episode(Episode):
     pass
 
 class OgladajAnime_pl(Service):
-    def __init__(self, default_agent: Optional[str]) -> None:
-        super().__init__(default_agent=default_agent)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
         self.base_url: str = "https://ogladajanime.pl"
         self.search_suggestions_url: str = "https://ogladajanime.pl/manager.php?action=get_anime_names"
 
         self.default_headers: dict = {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "Referer": self.base_url,
-            "X-Requested-With": "XMLHttpRequest"
+            "Host": self.base_url.split("://")[1].split("/")[0],
+            "Origin": self.base_url,          
+            "X-Requested-With": "XMLHttpRequest",
         }
-        self.default_agent: Optional[str] = default_agent
 
-    def get_search_suggestions(self, user_agent: Optional[str] = None) -> list[str]:
+    async def get_search_suggestions(self, user_agent: Optional[str] = None) -> list[str]:
         agent = user_agent or self.default_agent or None
         if not agent:
             raise ValueError("No user agent provided")
@@ -225,63 +309,110 @@ class OgladajAnime_pl(Service):
         headers = self.default_headers.copy()
         headers["User-Agent"] = agent
 
-        return json.loads(requests.get(self.search_suggestions_url, headers=headers).text)['json']
+        return json.loads(await self.requester.get(self.search_suggestions_url, headers=headers).text)['json']
     
-    def search(self, query: str, user_agent: Optional[str] = None) -> list[Union[Movie, Series]]:
-        def sanitize(string: str) -> str:
-            return string.replace("\t", "").strip("\n")
-        
-        def normalize(string: str):
-            return string.replace(" ", "-").lower()
-
-        agent = user_agent or self.default_agent or None
-        if not agent:
-            raise ValueError("No user agent provided")
-        
-        data = urlquote(f"search={query}&search_type=name")
-
-        headers = self.default_headers.copy()
-        headers = {
-            **headers,
-            "Referer": self.base_url + "/search/name/" + query.replace(" ", "-"),
-            "User-Agent": agent,
-            "Origin": self.base_url,
-            "Content-Length": str(len(data.encode()))
-        }
-
-        response = requests.post(self.base_url + "/search/name/" + query.replace(" ", "-"), headers=headers, data=data)
-        if response.status_code != 200:
-            raise ConnectionError("Failed to connect to the server")
-        
-        soup = bs4.BeautifulSoup(response.text, "html.parser")
-
-        results = []
-
-        for children in soup.find(id="anime_main").children:
+    async def search(self, query: str, get_tooltips: bool = True) -> list[Union[Movie, Series]]:
+        async def scrape_children(children: bs4.element.Tag, get_tooltips: bool = True) -> Union[Movie, Series]:
             if "h5" not in str(children):
-                continue
+                return None
+            
+            if get_tooltips:
+                tooltip_request_data = f"id={sanitize(children.find('h5').find('a')['title'])}"
+                try:
+                    tooltip = bs4.BeautifulSoup(json.loads((await self.requester.post(
+                        self.base_url + "/manager.php?action=get_anime_tooltip",
+                        data=tooltip_request_data,
+                        headers = {
+                            **headers,
+                            "Content-Length": str(len(tooltip_request_data.encode())),
+                            "Referer": self.base_url + "/search/name/" + query.replace(" ", "-"),
+                        }
+                    ))['text'])['data'], "html.parser")
+                except:
+                    pass
 
-            if normalize(sanitize(children.find("span", class_="badge").text)) == "movie":
-                results.append(OA_Movie(
-                    id=sanitize(children.find("h5").find("a")["title"]),
-                    url=self.base_url + sanitize(children.find("h5").find("a")["href"]),
-                    title=sanitize(children.find("h5").find("a").text),
-                    thumbnail=sanitize(children.find("img")["data-srcset"].split(" ")[0]),
-                    description=sanitize(children.find("p").text)
-                ))
-            else:
-                results.append(OA_Series(
+                media_type, pegi, rating, views, episodes_and_time, comments = [
+                    element.text for element in tooltip.find("div", class_="card-body").findChildren("div", recursive=False)[-1].find_all("span")
+                ]
+                episode_count, time_of_episode = episodes_and_time.strip().split(" ")
+                status, *emission = [
+                    element.find("div").text for element in tooltip.find("div", class_="card-body").findChildren("div", recursive=False)[-3].find_all("small")
+                ]
+
+                media_type = normalize(sanitize(media_type))
+
+                if media_type == "movie":
+                    emission_start = emission_end = emission
+                elif type(emission) == list and len(emission) > 1 and emission[1]:
+                    emission_start, emission_end = emission[0], emission[1]
+                else:
+                    emission_start = emission[0]
+                    emission_end = None
+
+                return (OA_Movie if media_type == "movie" else OA_Series)(
                     id=sanitize(children.find("h5").find("a")["title"]),
                     url=self.base_url + sanitize(children.find("h5").find("a")["href"]),
                     title=sanitize(children.find("h5").find("a").text),
                     thumbnail=sanitize(children.find("img")["data-srcset"].split(" ")[0]),
                     description=sanitize(children.find("p").text),
-                    type=sanitize(children.find("span", class_="badge").text)
-                ))
+                    pegi=sanitize(pegi),
+                    alternate_titles=[sanitize(title) for title in tooltip.find("small", class_="text-trim").text.split("|")],
+                    views=int(views.replace(" ", "")),
+                    trailer_url=sanitize(tooltip.find("iframe")["src"]) if tooltip.find("iframe") else None,
+                    genres=[sanitize(element.text) for element in tooltip.find("div", class_="card-body").findChildren("div", recursive=False)[-5].find_all("span")],
+                    tags=[sanitize(element.text) for element in tooltip.find("div", class_="card-body").findChildren("div", recursive=False)[-4].find_all("span")],
+                    rating=float(sanitize(rating)),
+                    **({
+                        "series_type": sanitize(children.find("span", class_="badge").text),
+                        "release_time": (datetime.strptime(emission_start, "%Y-%m-%d"), (datetime.strptime(emission_end, "%Y-%m-%d") if status == "Zakończone" and emission_end else None)),
+                        "episode_count": int(episode_count),
+                        "episode_length": int(sanitize(time_of_episode)[1:-1].replace("min", "")) * 60,
+                        "status": sanitize(status)
+                    } if normalize(sanitize(children.find("span", class_="badge").text)) != "movie" else {
+                        "length": int(sanitize(time_of_episode)[1:-1].replace("min", "")) * 60
+                    })
+                )
+
+            return (OA_Movie if normalize(sanitize(children.find("span", class_="badge").text)) == "movie" else OA_Series)(
+                id=sanitize(children.find("h5").find("a")["title"]),
+                url=self.base_url + sanitize(children.find("h5").find("a")["href"]),
+                title=sanitize(children.find("h5").find("a").text),
+                thumbnail=sanitize(children.find("img")["data-srcset"].split(" ")[0]),
+                description=sanitize(children.find("p").text),
+                **({
+                    "series_type": sanitize(children.find("span", class_="badge").text)
+                } if normalize(sanitize(children.find("span", class_="badge").text)) != "movie" else {})
+            )
+
+        def sanitize(string: str) -> str:
+            return string.replace("\t", "").strip("\n")
+        
+        def normalize(string: str):
+            return string.replace(" ", "-").lower()
+        
+        data = f"search={query}&search_type=name"
+
+        headers = self.default_headers.copy()
+        headers = {
+            **headers,
+            "Referer": self.base_url + "/search/name/" + query.replace(" ", "-"),
+            "Origin": self.base_url,
+            "Content-Length": str(len(data.encode()))
+        }
+
+        response = await self.requester.post(self.base_url + "/search/name/" + query.replace(" ", "-"), headers=headers, data=data)
+        if response['status'] != 200:
+            raise ConnectionError("Failed to connect to the server")
+        
+        soup = bs4.BeautifulSoup(response['text'], "html.parser")
+
+        scrappers = []
+
+        for children in soup.find(id="anime_main").children:
+           scrappers.append(scrape_children(children, get_tooltips))
+
+        results = await asyncio.gather(*scrappers)
+
+        results = [result for result in results if result]
 
         return results
-
-if __name__ == "__main__":
-    scrapper = OgladajAnime_pl("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
-    with open("search.json", "w") as file:
-        file.write(json.dumps([x.info() for x in scrapper.search("My Hero Academia")], indent=4))

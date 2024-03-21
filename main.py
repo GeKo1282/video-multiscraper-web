@@ -3,14 +3,16 @@ from typing import List, Optional, AnyStr, Tuple, Any, Literal, Union, Callable,
 from pathlib import Path
 from threading import Thread
 from datetime import datetime
+from scripts.webserver import WebExtender
+from scripts.scrappers import OgladajAnime_pl
+from scripts.api import APIExtender
 from scripts.helper.http import WebServer
 from scripts.helper.socket import WebSocketServer, WebSocketClientProtocol, websockets, SocketSession
-from scripts.webserver import WebExtender
-from scripts.api import APIExtender
 from scripts.helper.logger import Fore, Color
 from scripts.helper.cipher import RSACipher, AESCipher
 from scripts.helper.util import generate_id, sha512
 from scripts.helper.database import Database
+from scripts.helper.requester import Requester
 
 class ProgramController:
     def __init__(self, prepare: bool = False):
@@ -378,6 +380,25 @@ class ProgramController:
     async def start(self):
         self.websocketserver.start(host=self.settings['socketserver']['host'], port=self.settings['socketserver']['port'], handler=self.handle_websocket, as_thread=True)
         self.webserver.run(self.settings['webserver']['host'], self.settings['webserver']['port'])
+
+async def main():
+    Requester("oa-requester",
+     default_headers={
+        "Referer": "https://ogladajanime.pl",
+        "X-Requested-With": "XMLHttpRequest"
+     },
+     max_requests_per_minute=20, max_requests_per_second=20,
+     default_user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+    )
+
+    scrapper = OgladajAnime_pl(requester=Requester.get_requester("oa-requester"))
+    with open("search.json", "w") as file:
+        file.write(json.dumps([x.info() for x in await scrapper.search("My Hero Academia")], indent=4))
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+exit()
 
 if __name__ == "__main__":
     asyncio.run(ProgramController(prepare=True).start())
