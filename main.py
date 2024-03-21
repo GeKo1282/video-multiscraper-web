@@ -1,4 +1,4 @@
-import json, os, base64
+import json, os, base64, asyncio
 from typing import List, Optional, AnyStr, Tuple, Any, Literal, Union, Callable, Dict
 from pathlib import Path
 from threading import Thread
@@ -159,7 +159,7 @@ class ProgramController:
         
         return settings
 
-    def detach(self, callback: Callable, executor: Union[Callable, Thread] = Thread, *args, **kwargs) -> Thread:
+    async def detach(self, callback: Callable, executor: Union[Callable, Thread] = Thread, *args, **kwargs) -> Thread:
         thread = executor(target=callback, args=args, kwargs=kwargs)
         thread.start()
         return thread
@@ -375,9 +375,9 @@ class ProgramController:
 
         del self.websocket_sessions[websocket]
 
-    def start(self):
+    async def start(self):
         self.websocketserver.start(host=self.settings['socketserver']['host'], port=self.settings['socketserver']['port'], handler=self.handle_websocket, as_thread=True)
         self.webserver.run(self.settings['webserver']['host'], self.settings['webserver']['port'])
 
 if __name__ == "__main__":
-    ProgramController(prepare=True).start()
+    asyncio.run(ProgramController(prepare=True).start())
