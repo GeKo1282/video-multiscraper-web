@@ -1,4 +1,4 @@
-import random
+import random, requests, json
 from typing import Union, Literal, List
 from hashlib import sha512 as nonsalt_sha512
 
@@ -32,3 +32,6 @@ def sha512(data: Union[str, bytes], salt: Union[str, bytes] = None) -> str:
         return nonsalt_sha512((data + salt)).hexdigest()
     
     return nonsalt_sha512(data).hexdigest()
+
+def get_user_agents() -> List[str]:
+    return json.loads(requests.get("https://cdn.jsdelivr.net/gh/microlinkhq/top-user-agents@master/src/index.json").text)

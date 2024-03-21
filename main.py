@@ -379,15 +379,5 @@ class ProgramController:
         self.websocketserver.start(host=self.settings['socketserver']['host'], port=self.settings['socketserver']['port'], handler=self.handle_websocket, as_thread=True)
         self.webserver.run(self.settings['webserver']['host'], self.settings['webserver']['port'])
 
-
-def main():
-    SETTINGS = json.load(open("data/settings.json"))
-
-    webserver = WebServer()
-    api_extender = APIExtender(socket_host=SETTINGS['socketserver']['host'], socket_port=SETTINGS['socketserver']['port'])
-    webserver.add_path("/", ["POST"], api_extender)
-    webserver.register_paths()
-    webserver.run(SETTINGS['webserver']['host'], SETTINGS['webserver']['port'])
-
 if __name__ == "__main__":
     ProgramController(prepare=True).start()
