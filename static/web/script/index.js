@@ -1,14 +1,75 @@
-addLoadEvent(async () => {
-    // Temporay test
-    await sleep(2000);
+global.default_socket_hander = (decrypted, _) => {
+    console.log(decrypted);
+}
 
-    document.getElementById('homepage-window').classList.remove('shown');
-    document.getElementById('someother-window').classList.add('shown');
+global.user_info_updaters = {
+    "displayname": ['#user-profile-box .profile-name'],
+    "avatar": [() => {
+        document.getElementById('user-profile-box').getElementsByClassName('profile-image')[0].setAttribute('style', '--image-url: url(' + global.user.info.avatar_url + ');');
+    }]
+}
+
+addLoadEvent(async () => {
+    if (!localStorage.getItem('token') || !localStorage.getItem('user_id')) {
+        window.location.href = '/login';
+    }
 })
 
-addLoadEvent(() => {
+addLoadEvent(async () => {
+    if (!global.user) global.user = {};
+    if (!global.user.info) global.user.info = {};
+    global.user.info.id = localStorage.getItem('user_id');
+    global.user.info.token = localStorage.getItem('token');
+
+    await initialize_websocket_communications(global.default_socket_hander);
+    await get_user_info();
+    update_user_info();
     assign_clicks();
 })
+
+async function get_user_info() {
+    let promise = new Promise((resolve, reject) => {
+        global.websocket.onmessage = (decrypted, _) => {
+            if (decrypted.action != 'send-user-info' || !decrypted.success) {
+                global.default_socket_hander(decrypted, _);
+                return;
+            }
+            
+            if (!global.user) global.user = {};
+            if (!global.user.info) global.user.info = {};
+
+            global.user.info.username = decrypted.data.username;
+            global.user.info.displayname = decrypted.data.displayname;
+            global.user.info.email = decrypted.data.email;
+            global.user.info.avatar_url = decrypted.data.avatar;
+            global.user.info.created_at = decrypted.data.created_at;
+
+            resolve();
+        }
+    });
+
+    global.websocket.send(JSON.stringify({
+        action: 'get-user-info',
+        data: {
+            id: global.user.info.id,
+            token: global.user.info.token
+        }
+    }));
+
+    await promise;
+}
+
+function update_user_info() {
+    for (let key of Object.keys(global.user_info_updaters)) {
+        for (let element of global.user_info_updaters[key]) {
+            if (typeof element == 'string') {
+                document.querySelector(element).innerText = global.user.info[key];
+            } else {
+                element();
+            }
+        }
+    }
+}
 
 function assign_clicks() {
     let events = {

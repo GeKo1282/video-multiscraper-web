@@ -3,3 +3,4 @@ pycryptodome
 websockets
 requests
 beautifulsoup4
+aiohttp

@@ -41,6 +41,8 @@ class ProgramController:
             }
         }
 
+        self.oa: OgladajAnime_pl = None
+
         if prepare:
             self.prepare()
 
@@ -60,7 +62,18 @@ class ProgramController:
         
         host = self.settings['socketserver']['host'] if self.settings['socketserver']['host'] != self.settings['webserver']['host'] and not self.settings['socketserver']['host'] == "0.0.0.0" else ""
         self.webserver.add_path("/", ["POST"], APIExtender(socket_host=host, socket_port=self.settings['socketserver']['port'], public_rsa_key=self.rsa.public_key()))
-        self.webserver.extend(WebExtender())
+        self.webserver.extend(WebExtender(database=self.database))
+
+        Requester("oa-requester",
+            default_headers={
+                "Referer": "https://ogladajanime.pl",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            max_requests_per_minute=20, max_requests_per_second=20,
+            default_user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        )
+
+        self.oa = OgladajAnime_pl(requester=Requester.get_requester("oa-requester"))
 
         self.database.create_table("users", [
             "id TEXT PRIMARY KEY UNIQUE NOT NULL",
@@ -309,7 +322,7 @@ class ProgramController:
                     continue
 
                 await WebSocketServer.send(websocket, {
-                    "action": "get-user-auth",
+                    "action": "send-user-auth",
                     "data": {
                         "id": user[0][0],
                         "token": user[0][2]
@@ -365,10 +378,35 @@ class ProgramController:
                 [user_id, email, username, displayname, password, salt, user_token, "{}", None, datetime.now(), True, False, False])
 
                 await WebSocketServer.send(websocket, {
-                    "action": "register",
+                    "action": "send-user-auth",
                     "data": {
                         "id": user_id,
                         "token": user_token
+                    },
+                    "success": True
+                }, session)
+
+            if data.get('action') == 'get-user-info':
+                if any([not data['data'].get(field) for field in ['id', 'token']]):
+                    await send_error("Invalid data.", action=data.get('action'))
+                    continue
+
+                user = self.database.select("users", ["username", "email", "displayname", "created"], "id = ? AND token = ?", [data['data']['id'], data['data']['token']])
+
+                if not user:
+                    await send_error("Invalid credentials.", code=111, action=data.get('action'), additional={
+                        "success": False
+                    })
+                    continue
+
+                await WebSocketServer.send(websocket, {
+                    "action": "send-user-info",
+                    "data": {
+                        "username": user[0][0],
+                        "email": user[0][1],
+                        "displayname": user[0][2],
+                        "created": user[0][3],
+                        "avatar": f"/cdn/user/{data['data']['id']}/avatar"
                     },
                     "success": True
                 }, session)
@@ -396,9 +434,6 @@ async def main():
         file.write(json.dumps([x.info() for x in await scrapper.search("My Hero Academia")], indent=4))
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
-exit()
-
-if __name__ == "__main__":
     asyncio.run(ProgramController(prepare=True).start())
+    #asyncio.run(main())
+    

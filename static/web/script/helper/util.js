@@ -165,7 +165,7 @@ function make_validator_function(type, data) {
     };
 }
 
-async function initialize_websocket_communications(regular_handler, authorization) {
+async function initialize_websocket_communications(regular_handler) {
     let continue_setup = false;
 
     if (!global.rsa) {

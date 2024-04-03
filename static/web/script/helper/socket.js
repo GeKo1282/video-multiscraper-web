@@ -185,6 +185,10 @@ class WebSocketClient {
                 }
             }
         }
+        
+        try {
+            decrypted = JSON.parse(decrypted);
+        } catch (e) {}
 
         this.#onmessage_handler(decrypted, message);
     }
