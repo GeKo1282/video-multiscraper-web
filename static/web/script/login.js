@@ -84,8 +84,6 @@ addLoadEvent(() => {
 
 addLoadEvent(async () => {
     global.socket_hander = (decrypted, _message_object) => {
-        decrypted = JSON.parse(decrypted);
-
         if (decrypted.action == 'login') {
             if (decrypted.success) {
                 sessionStorage.setItem('token', decrypted.data.token);
@@ -111,14 +109,12 @@ async function login() {
     }
 
     global.websocket.onmessage = (decrypted, _) => {
-        decrypted = JSON.parse(decrypted);
         if (decrypted.action != 'get-salt' || !decrypted.success) {
             global.socket_hander(decrypted, _);
             return;
         }
 
         global.websocket.onmessage = (decrypted, _) => {
-            decrypted = JSON.parse(decrypted);
             if (decrypted.action != 'send-user-auth' || !decrypted.success) {
                 global.socket_hander(decrypted, _);
                 return;
@@ -172,7 +168,6 @@ async function register() {
     }
 
     global.websocket.onmessage = (decrypted, _) => {
-        decrypted = JSON.parse(decrypted);
         if (decrypted.action != 'send-user-auth' || !decrypted.success) {
             global.socket_hander(decrypted, _);
             return;
