@@ -1,9 +1,13 @@
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 from scripts.helper.socket import WebSocketServer, SocketSession
 from scripts.helper.cipher import RSACipher
 from scripts.helper.database import Database
 from scripts.helper.util import generate_id, sha512
+from scripts.scrappers import OgladajAnime_pl
 from websockets import WebSocketClientProtocol
 from datetime import datetime
+from typing import List, Tuple, Optional
 
 async def send_error(websocket: WebSocketClientProtocol, session: SocketSession, error: str, code: int = 0, action: str = None, additional: dict = None):
     # Codes table:
@@ -175,3 +179,30 @@ async def get_user_info(session: SocketSession, websocket: WebSocketClientProtoc
         },
         "success": True
     }, session)
+
+async def get_search_suggestions(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, oa: OgladajAnime_pl):    
+    query: str = data['data'].get('query')
+    if not query:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+
+    # Hard limit maximum suggestions to 20
+    limit = min(data['data'].get('limit', 5), 20)
+
+    # vectorizer = TfidfVectorizer()
+    # suggestions_vectors = vectorizer.fit_transform(suggestions)
+    # query_vector = vectorizer.transform([query])
+
+    # similarities = cosine_similarity(query_vector, suggestions_vectors)
+
+    # ranked_suggestions = [(suggestion, similarity) for suggestion, similarity in zip(suggestions, similarities[0])]
+    # ranked_suggestions.sort(key=lambda x: x[1], reverse=True)
+
+    await WebSocketServer.send(websocket, {
+        "action": "send-search-suggestions",
+        "data": {
+            "query": query,
+            "suggestions": await oa.get_search_suggestions(query, limit)
+        },
+        "success": True
+    }, session, unencrypted=True)

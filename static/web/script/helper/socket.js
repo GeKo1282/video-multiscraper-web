@@ -180,8 +180,12 @@ class WebSocketClient {
             try {
                 decrypted = this.rsa_cipher.decrypt(message.data);
             } catch (e) {
-                if (global.LOG <= global.LOG_LEVELS.ERROR) {
-                    console.error('Failed to decrypt message!\n' + message.data);
+                try {
+                    decrypted = JSON.parse(message.data);
+                } catch (e) {
+                    if (global.LOG <= global.LOG_LEVELS.ERROR) {
+                        console.error('Failed to decrypt message!\n' + message.data);
+                    }
                 }
             }
         }

@@ -287,11 +287,15 @@ class OA_Episode(Episode):
     pass
 
 class OgladajAnime_pl(Service):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, search_suggestion_cache_size: int = (1024 * 1024 * 100), **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         self.base_url: str = "https://ogladajanime.pl"
         self.search_suggestions_url: str = "https://ogladajanime.pl/manager.php?action=get_anime_names"
+
+        self.search_suggestions: List[str] = []
+        self.search_suggestions_cache: dict[str, list[str]] = {}
+        self.search_suggestion_cache_size: int = search_suggestion_cache_size
 
         self.default_headers: dict = {
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -301,16 +305,38 @@ class OgladajAnime_pl(Service):
             "X-Requested-With": "XMLHttpRequest",
         }
 
-    async def get_search_suggestions(self, user_agent: Optional[str] = None) -> list[str]:
-        agent = user_agent or self.default_agent or None
-        if not agent:
-            raise ValueError("No user agent provided")
-        
-        headers = self.default_headers.copy()
-        headers["User-Agent"] = agent
+    async def get_search_suggestions(self, query: str, limit: int, *, force_get: bool = False) -> list[str]:
+        if force_get or not self.search_suggestions:
+            self.search_suggestions = json.loads((await self.requester.get(self.search_suggestions_url))['text'])['json']
 
-        return json.loads(await self.requester.get(self.search_suggestions_url, headers=headers).text)['json']
-    
+        if query in self.search_suggestions_cache and len(self.search_suggestions_cache[query]) >= limit:
+            return self.search_suggestions_cache[query][:limit]
+        
+        suggestions = self.search_suggestions_cache.get(query[:-1], None) or self.search_suggestions
+        if len(suggestions) < limit:
+            suggestions = self.search_suggestions
+
+        to_return = []
+
+        for suggestion in suggestions:
+            if suggestion.lower().replace(" ", "").startswith(query.lower().replace(" ", "")):
+                to_return.append(suggestion)
+            
+                if len(to_return) >= limit:
+                    break
+
+        if len(to_return) < limit and len(suggestions) < len(self.search_suggestions):
+            for suggestion in self.search_suggestions:
+                if suggestion.lower().replace(" ", "").startswith(query.lower().replace(" ", "")):
+                    to_return.append(suggestion)
+                
+                    if len(to_return) >= limit:
+                        break
+
+        self.search_suggestions_cache[query] = to_return
+
+        return to_return
+
     async def search(self, query: str, get_tooltips: bool = True) -> list[Union[Movie, Series]]:
         async def scrape_children(children: bs4.element.Tag, get_tooltips: bool = True) -> Union[Movie, Series]:
             if "h5" not in str(children):

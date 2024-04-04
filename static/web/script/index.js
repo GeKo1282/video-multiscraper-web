@@ -1,4 +1,12 @@
 global.default_socket_hander = (decrypted, _) => {
+    if (decrypted.action == "send-search-suggestions") {
+        if (!global.search_suggestions_cache) global.search_suggestions_cache = {};
+
+        global.search_suggestions_cache[decrypted.data.query] = decrypted.data.suggestions;
+        update_search_suggestions(decrypted.data.suggestions);
+        return;
+    }
+
     console.log(decrypted);
 }
 
@@ -25,6 +33,7 @@ addLoadEvent(async () => {
     await get_user_info();
     update_user_info();
     assign_clicks();
+    assign_handlers();
 })
 
 async function get_user_info() {
@@ -85,6 +94,43 @@ function assign_clicks() {
     }
 }
 
+function assign_handlers() {
+    document.getElementById('search-bar').getElementsByClassName('search-input')[0].addEventListener('keyup', get_search_suggestions);
+    document.getElementById('search-bar').getElementsByClassName('search-input')[0].addEventListener('keydown', async (event) => {
+        if (event.key == 'Enter') {
+            let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
+            switch_page('search');
+            await websocket.send(JSON.stringify({
+                action: 'search',
+                data: {
+                    query: value
+                }
+            }));
+        }
+    });
+}
+
+async function get_search_suggestions() {
+    let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
+
+    if (value.length == 0) {
+        update_search_suggestions([]);
+        return;
+    }
+
+    if (global.search_suggestions_cache && global.search_suggestions_cache[value]) {
+        update_search_suggestions(global.search_suggestions_cache[value]);
+        return;
+    }
+
+    await global.websocket.send(JSON.stringify({
+        action: 'get-search-suggestions',
+        data: {
+            query: value
+        }
+    }));
+}
+
 function logout() {
     localStorage.removeItem('token');
 }
@@ -102,5 +148,21 @@ function switch_user_menu() {
         hide_user_menu();
     } else {
         show_user_menu();
+    }
+}
+
+function update_search_suggestions(suggestions) {
+    let suggestions_box = document.getElementById('search-bar').getElementsByClassName('search-suggestions')[0];
+    suggestions_box.innerHTML = '';
+
+    for (let suggestion of suggestions) {
+        let suggestion_element = document.createElement('div');
+        suggestion_element.classList.add('suggestion');
+        suggestion_element.innerText = suggestion;
+        suggestion_element.addEventListener('click', () => {
+            document.getElementById('search-bar').getElementsByClassName('search-input')[0].value = suggestion;
+            update_search_suggestions([]);
+        });
+        suggestions_box.appendChild(suggestion_element);
     }
 }

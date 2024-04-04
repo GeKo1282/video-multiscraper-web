@@ -207,7 +207,7 @@ class ProgramController:
                 pass
 
             if session.state >= SocketSession.State.ENCRYPTED:
-                await send_error("Could not read data.")
+                await send_error(websocket, session, "Could not read data.")
                 raise CouldNotLoadData
             
             return data
@@ -231,7 +231,7 @@ class ProgramController:
             except (websockets.exceptions.ConnectionClosedError, websockets.exceptions.ConnectionClosedOK):
                 break
             except CouldNotLoadData:
-                send_error("Could not read data.")
+                await send_error(websocket, session, "Could not read data.")
                 continue
 
             if data.get('action') == 'get-rsa-key':
@@ -269,6 +269,10 @@ class ProgramController:
 
             if data.get('action') == 'get-user-info':
                 await get_user_info(session, websocket, data, self.database)
+                continue
+
+            if data.get('action') == 'get-search-suggestions':
+                await get_search_suggestions(session, websocket, data, self.oa)
                 continue
             
             print(f"Received: {data}")

@@ -124,9 +124,9 @@
 
     gap: 15px;
 
-    overflow: hidden;
-
     padding: 0 15px;
+
+    position: relative;
 }
 
 #search-bar > .search-input {
@@ -149,4 +149,28 @@
     height: 60%;
     aspect-ratio: 1;
     fill: currentColor;
+}
+
+#search-bar .search-suggestions {
+    position: absolute;
+    min-width: 100%;
+    width: 120%;
+    max-width: 150%;
+    top: calc(100% + 50px);
+    left: 50%;
+    border: 2px solid rgba(var(--primary-color));
+    border-radius: 5px;
+    box-shadow: 0 0 10px 0 rgba(var(--primary-color));
+    padding: 15px;
+    transform: translate(-50%, 0);
+    text-wrap: nowrap;
+    overflow: hidden;
+    background: var(--window-background);
+    transition: 300ms ease;
+    opacity: 1;
+}
+
+#search-bar .search-suggestions:not(:has(div)) {
+    opacity: 0;
+    pointer-events: none;
 }
