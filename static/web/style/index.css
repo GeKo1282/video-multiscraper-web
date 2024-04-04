@@ -3,7 +3,7 @@
     width: 100%;
     height: var(--topbar-height);
     left: 0;
-    top: calc(0px - var(--topbar-height));
+    top: 0;
 
     padding: 20px 30px;
 

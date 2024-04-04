@@ -4,7 +4,7 @@ from scripts.helper.socket import WebSocketServer, SocketSession
 from scripts.helper.cipher import RSACipher
 from scripts.helper.database import Database
 from scripts.helper.util import generate_id, sha512
-from scripts.scrappers import OgladajAnime_pl
+from scripts.scrappers import Service, OgladajAnime_pl
 from websockets import WebSocketClientProtocol
 from datetime import datetime
 from typing import List, Tuple, Optional
@@ -206,3 +206,27 @@ async def get_search_suggestions(session: SocketSession, websocket: WebSocketCli
         },
         "success": True
     }, session, unencrypted=True)
+
+async def search(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, services: List[Service], database: Database):
+    query, limit, start, provider, categorize, user_id, token = \
+    (data['data'].get('query'),
+    min(data['data'].get('limit', 10), 100),
+    data['data'].get('start', 0),
+    data['data'].get('provider', 'all'),
+    data['data'].get('categorize', "mixed"),
+    data['data'].get('id'),
+    data['data'].get('token'))
+
+    if not user_id or not token or not query:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+    
+    user = database.select("users", ["id"], "id = ? AND token = ?", [user_id, token])
+
+    if not user:
+        await send_error(websocket, session, "Invalid credentials.", code=111, action=data.get('action'), additional={
+            "success": False
+        })
+        return
+    
+

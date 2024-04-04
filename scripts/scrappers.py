@@ -17,20 +17,23 @@ class Service:
             "X-Requested-With": "XMLHttpRequest"
         }, max_requests_per_minute=20, max_requests_per_second=20)
 
-    async def get_search_suggestions(self, hint: str = None, limit: int = 10, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
+    async def get_search_suggestions(self, query: str, limit: int, *, force_get: bool = False) -> List[str]:
         '''
             This method is intended to be overwritten by devired classes.
         '''
+        return []
 
-    async def get_homepage_suggestions(self, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
+    async def get_homepage_suggestions(self) -> List[str]:
         '''
             This method is intended to be overwritten by devired classes.
         '''
+        return []
 
-    async def search(self, query: str, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[Union["Movie", "Series"]]:
+    async def search(self, query: str, limit: int) -> List[Union["Movie", "Series"]]:
         '''
             This method is intended to be overwritten by devired classes.
         '''
+        return []
 
     def info(self, type: Union[Literal['printable'], Literal['JSON']] = "JSON") -> dict:
         if type.lower() == "json":
@@ -43,7 +46,6 @@ class Service:
         return f"Base URL: {self.base_url}\n" +\
          f"Homepage URL: {self.homepage_url}\n" +\
          f"Search Suggestions URL: {self.search_suggestions_url}"
-
 class Movie:
     def __init__(self, url: str, title: str = None, thumbnail: str = None, description: str = None,
      genres: List[str] = None, release_year: int = None, duration: str = None, rating: float = None,

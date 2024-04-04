@@ -274,6 +274,10 @@ class ProgramController:
             if data.get('action') == 'get-search-suggestions':
                 await get_search_suggestions(session, websocket, data, self.oa)
                 continue
+
+            if data.get('action') == 'search':
+                await get_search_suggestions(session, websocket, data, self.oa)
+                continue
             
             print(f"Received: {data}")
 

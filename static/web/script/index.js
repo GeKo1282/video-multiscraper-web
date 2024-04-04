@@ -99,11 +99,15 @@ function assign_handlers() {
     document.getElementById('search-bar').getElementsByClassName('search-input')[0].addEventListener('keydown', async (event) => {
         if (event.key == 'Enter') {
             let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
-            switch_page('search');
+            switch_window('search');
             await websocket.send(JSON.stringify({
                 action: 'search',
                 data: {
-                    query: value
+                    query: value,
+                    limit: 20,
+                    start: 0,
+                    provider: 'all',
+                    categorize: 'stored+mixed+providers'
                 }
             }));
         }
@@ -165,4 +169,16 @@ function update_search_suggestions(suggestions) {
         });
         suggestions_box.appendChild(suggestion_element);
     }
+}
+
+function switch_window(partial_id) {
+    if (!partial_id.endsWith('-window')) partial_id += '-window';
+
+    let all_windows = document.getElementById('app-layer').getElementsByClassName('window');
+
+    all_windows.filter(window => window.id != partial_id).forEach(window => {
+        window.classList.remove('shown');
+    });
+
+    document.getElementById(partial_id).classList.add('shown');
 }

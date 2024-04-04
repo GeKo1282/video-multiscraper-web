@@ -75,15 +75,11 @@ body {
 }
 
 :not(body.login-page) > :is(#app-layer, #floating-layer) > .content > .content-background {
-    padding-top: var(--topbar-height);
-}
-
-:not(body.login-page) > :is(#app-layer, #floating-layer) > .content > .content-background {
     width: 100%;
     height: 100%;
 }
 
-:is(#app-layer, #floating-layer) .content-background > .window {
+:not(body.index) > :is(#app-layer, #floating-layer) .content-background > .window {
     color: rgb(var(--font-color));
     padding: 20px;
 
