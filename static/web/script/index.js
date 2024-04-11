@@ -1,12 +1,4 @@
 global.default_socket_hander = (decrypted, _) => {
-    if (decrypted.action == "send-search-suggestions") {
-        if (!global.search_suggestions_cache) global.search_suggestions_cache = {};
-
-        global.search_suggestions_cache[decrypted.data.query] = decrypted.data.suggestions;
-        update_search_suggestions(decrypted.data.suggestions);
-        return;
-    }
-
     console.log(decrypted);
 }
 
@@ -36,11 +28,24 @@ addLoadEvent(async () => {
     assign_handlers();
 })
 
+function switch_page(page_id) {
+    if (!page_id.endsWith('-page')) page_id += '-page';
+
+    let pages = [...Array.from(document.getElementById("app-layer").getElementsByClassName('page shown')),
+    ...Array.from(document.getElementById("floating-layer").getElementsByClassName('page shown'))];
+
+    pages.forEach((element) => {
+        element.classList.remove('shown');
+    });
+
+    document.getElementById(page_id).classList.add('shown');
+}
+
 async function get_user_info() {
     let promise = new Promise((resolve, reject) => {
-        global.websocket.onmessage = (decrypted, _) => {
+        global.websocket.add_onmessage((decrypted, _, self) => {
             if (decrypted.action != 'send-user-info' || !decrypted.success) {
-                global.default_socket_hander(decrypted, _);
+                global.websocket.pass_onmessage(self, decrypted, _);
                 return;
             }
             
@@ -53,8 +58,10 @@ async function get_user_info() {
             global.user.info.avatar_url = decrypted.data.avatar;
             global.user.info.created_at = decrypted.data.created_at;
 
+            global.websocket.remove_onmessage(self);
+
             resolve();
-        }
+        });
     });
 
     global.websocket.send(JSON.stringify({
@@ -99,25 +106,38 @@ function assign_handlers() {
     document.getElementById('search-bar').getElementsByClassName('search-input')[0].addEventListener('keydown', async (event) => {
         if (event.key == 'Enter') {
             let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
-            switch_window('search');
-            await websocket.send(JSON.stringify({
+            
+            global.websocket.add_onmessage((decrypted, _, self) => {
+                if (decrypted.action != 'search-results') global.websocket.pass_onmessage(self, decrypted, _);
+                
+
+                console.log(decrypted);
+                update_search_results(decrypted.data);
+                switch_page('search-results');
+                global.websocket.remove_onmessage(self);
+            });
+            
+            await global.websocket.send(JSON.stringify({
                 action: 'search',
                 data: {
-                    query: value,
-                    limit: 20,
-                    start: 0,
-                    provider: 'all',
-                    categorize: 'stored+mixed+providers'
+                    query: value
                 }
             }));
         }
     });
 }
 
-async function get_search_suggestions() {
+async function get_search_suggestions(event) {
     let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
 
     if (value.length == 0) {
+        update_search_suggestions([]);
+        return;
+    }
+
+    if(event.key == 'Enter') return;
+    if (event.key == 'ArrowDown' || event.key == 'ArrowUp') return;
+    if (event.key == 'Escape') {
         update_search_suggestions([]);
         return;
     }
@@ -126,6 +146,17 @@ async function get_search_suggestions() {
         update_search_suggestions(global.search_suggestions_cache[value]);
         return;
     }
+
+    global.websocket.add_onmessage((decrypted, _, self) => {
+        if (decrypted.action != 'send-search-suggestions') global.websocket.pass_onmessage(self, decrypted, _);
+
+        if (!global.search_suggestions_cache) global.search_suggestions_cache = {};
+
+        global.search_suggestions_cache[decrypted.data.query] = decrypted.data.suggestions;
+        update_search_suggestions(decrypted.data.suggestions);
+        global.websocket.remove_onmessage(self);
+        return;
+    });
 
     await global.websocket.send(JSON.stringify({
         action: 'get-search-suggestions',
@@ -171,14 +202,61 @@ function update_search_suggestions(suggestions) {
     }
 }
 
-function switch_window(partial_id) {
-    if (!partial_id.endsWith('-window')) partial_id += '-window';
+function update_search_results(results_json) {
+    let results_box = document.getElementById('search-results');
+    results_box.innerHTML = '';
 
-    let all_windows = document.getElementById('app-layer').getElementsByClassName('window');
+    let header = document.createElement('div');
+    header.classList.add('header');
+    header.innerText = 'Search Results For: ' + results_json.query;
 
-    all_windows.filter(window => window.id != partial_id).forEach(window => {
-        window.classList.remove('shown');
-    });
+    results_box.appendChild(header);
 
-    document.getElementById(partial_id).classList.add('shown');
+    for (let result of results_json.results) {
+        let result_element = document.createElement('div');
+        
+        let tooltip = document.createElement('div');
+        let tooltip_icon = document.createElement('div');
+
+        let thumbnail = document.createElement('img');
+        let details = document.createElement('div');
+
+        let title = document.createElement('div');
+        let description = document.createElement('div');
+        
+        thumbnail.classList.add('thumbnail');
+        details.classList.add('details');
+        title.classList.add('title');
+        description.classList.add('description');
+        result_element.classList.add('result');
+        tooltip.classList.add('tooltip');
+        tooltip_icon.classList.add('tooltip-icon');
+
+        tooltip_icon.setAttribute('data-icon', 'more');
+
+        tooltip_icon = make_icon(tooltip_icon);
+
+        thumbnail.src = result.thumbnail;
+
+        title.innerText = result.title;
+        description.innerText = result.description;
+
+        result_element.addEventListener('click', () => {
+            open_content_page(result.uid);
+        });
+
+        details.appendChild(title);
+        details.appendChild(description);
+        tooltip.appendChild(tooltip_icon);
+
+        result_element.appendChild(thumbnail);
+        result_element.appendChild(details);
+        result_element.appendChild(tooltip);
+
+        results_box.appendChild(result_element);
+    }
+}
+
+function open_content_page(content_id) {
+    console.log(content_id);
 }

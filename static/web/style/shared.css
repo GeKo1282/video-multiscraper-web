@@ -79,7 +79,7 @@ body {
     height: 100%;
 }
 
-:not(body.index) > :is(#app-layer, #floating-layer) .content-background > .window {
+:is(#app-layer, #floating-layer) .content-background > .window {
     color: rgb(var(--font-color));
     padding: 20px;
 

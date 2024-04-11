@@ -22,7 +22,7 @@ class WebSocketClient {
     #socket = null;
 
     #onopen_handler = null;
-    #onmessage_handler = null;
+    #onmessage_handler_stack = [];
     
     #server_rsa_key = null;
 
@@ -43,8 +43,33 @@ class WebSocketClient {
         this.#onopen_handler = handler;
     }
 
-    set onmessage(handler) {
-        this.#onmessage_handler = handler;
+    add_onmessage(handler) {
+        this.#onmessage_handler_stack.push(handler);
+    }
+
+    remove_onmessage(handler) {
+        this.#onmessage_handler_stack = this.#onmessage_handler_stack.filter((value) => value != handler);
+    }
+
+    clear_onmessage() {
+        this.#onmessage_handler_stack = [];
+    }
+
+    pass_onmessage(handler, decrypted, message) {
+        if (this.#onmessage_handler_stack.indexOf(handler) < 1) return false;
+
+        let stack_handler = this.#onmessage_handler_stack[this.#onmessage_handler_stack.indexOf(handler) - 1];
+        stack_handler(decrypted, message, stack_handler);
+    
+        return true;
+    }
+
+    get onopen() {
+        return this.#onopen_handler;
+    }
+
+    get onmessage() {
+        return this.#onmessage_handler_stack;
     }
     
     #request_server_rsa() {
@@ -74,7 +99,7 @@ class WebSocketClient {
     }
 
     start() {
-        if (this.#onmessage_handler == null)
+        if (!this.#onmessage_handler_stack)
             throw 'onmessage handler must be set!';
 
         if (!this.#onopen_handler) this.#onopen_handler = () => {};
@@ -194,7 +219,9 @@ class WebSocketClient {
             decrypted = JSON.parse(decrypted);
         } catch (e) {}
 
-        this.#onmessage_handler(decrypted, message);
+
+        let stack_handler = this.#onmessage_handler_stack[this.#onmessage_handler_stack.length - 1];
+        stack_handler(decrypted, message, stack_handler);
     }
 
     send(data) {

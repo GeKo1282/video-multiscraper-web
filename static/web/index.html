@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Homepage</title>
 
-    <link rel="stylesheet" href="style/user.css">
     <link rel="stylesheet" href="style/root.css">
     <link rel="stylesheet" href="style/shared.css">
     <link rel="stylesheet" href="style/index.css">
@@ -25,10 +24,10 @@
         }
     </style>
 </head>
-<body class="index">
+<body>
     <div id="app-layer" class="layer">
         <div class="content">
-            <div class="content-background">
+            <div class="content-background" style="display: flex;flex-direction: column;">
                 <div id="app-topbar">
                     <div class="title">Titile (lol)</div>
 
@@ -55,11 +54,13 @@
                     </div>
                 </div>
 
-                <div class="window animate shown" id="homepage-window">
+                <div class="page window animate shown" id="user-home-page">
 
                 </div>
 
-                <div class="window animate" id="search-window"></div>
+                <div class="page window animate" id="search-results-page">
+                    <div id="search-results"></div>
+                </div>
             </div>
         </div>
     </div>

@@ -276,12 +276,15 @@ class ProgramController:
                 continue
 
             if data.get('action') == 'search':
-                await get_search_suggestions(session, websocket, data, self.oa)
+                await search(session, websocket, data, self.oa)
                 continue
             
             print(f"Received: {data}")
 
-        del self.websocket_sessions[websocket]
+        try:
+            del self.websocket_sessions[websocket]
+        except:
+            pass
 
     async def start(self):
         self.websocketserver.start(host=self.settings['socketserver']['host'], port=self.settings['socketserver']['port'], handler=self.handle_websocket, as_thread=True)
@@ -305,3 +308,4 @@ if __name__ == "__main__":
     asyncio.run(ProgramController(prepare=True).start())
     #asyncio.run(main())
     
+#TODO: Asynchronously download thumbnails in background, and if already downloaded serve own url instead of upstream

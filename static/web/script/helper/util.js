@@ -67,6 +67,12 @@ global.icons = {
         path: [
             "M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"
         ]
+    },
+    more: {
+        type: "svg",
+        path: [
+            "M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3m5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3"
+        ]
     }
 }
 
@@ -199,7 +205,7 @@ async function initialize_websocket_communications(regular_handler) {
 
         global.websocket = new WebSocketClient(websocket_address, global.rsa, global.aes);
 
-        global.websocket.onmessage = regular_handler;
+        global.websocket.add_onmessage(regular_handler);
 
         global.websocket.start();
     }
@@ -209,30 +215,36 @@ async function initialize_websocket_communications(regular_handler) {
     }
 }
 
+function make_icon(element) {
+    let icon_name = element.dataset.icon;
+
+    if (!Object.keys(global.icons).includes(icon_name)) {
+        return element;
+    }
+
+    if (global.icons[icon_name].type == "svg") {
+        let svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+
+        svg.setAttribute('viewBox', '0 0 16 16');
+        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+        for (let path of global.icons[icon_name].path) {
+            let path_element = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path_element.setAttribute('d', path);
+            path_element.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            svg.appendChild(path_element);
+        }
+
+        element.appendChild(svg);
+    }
+
+    return element;
+}
+
 function place_icons() {
     let icons = document.getElementsByClassName('icon');
     for (let icon of icons) {
-        let icon_name = icon.dataset.icon;
-
-        if (!Object.keys(global.icons).includes(icon_name)) {
-            continue;
-        }
-
-        if (global.icons[icon_name].type == "svg") {
-            let svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-
-            svg.setAttribute('viewBox', '0 0 16 16');
-            svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-
-            for (let path of global.icons[icon_name].path) {
-                let path_element = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                path_element.setAttribute('d', path);
-                path_element.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-                svg.appendChild(path_element);
-            }
-
-            icon.appendChild(svg);
-        }       
+        icon.outerHTML = make_icon(icon).outerHTML;
     }
 }
 

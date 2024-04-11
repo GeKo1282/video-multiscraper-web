@@ -1,6 +1,11 @@
+body {
+    overflow: hidden;
+}
+
 #app-topbar {
     position: relative;
     width: 100%;
+    max-width: 100%;
     height: var(--topbar-height);
     left: 0;
     top: 0;
@@ -168,9 +173,120 @@
     background: var(--window-background);
     transition: 300ms ease;
     opacity: 1;
+
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 #search-bar .search-suggestions:not(:has(div)) {
     opacity: 0;
     pointer-events: none;
+}
+
+#search-bar .search-suggestions .suggestion {
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    flex-direction: row;
+    padding: 10px 20px;
+    border-radius: 5px;
+}
+
+#search-bar .search-suggestions .suggestion:hover {
+    background: rgba(var(--primary-color), 0.2);
+    cursor: pointer;
+}
+
+#search-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    justify-items: center;
+    column-gap: 10px;
+    row-gap: 80px;
+}
+
+#search-results > .header {
+    font-size: 48px;
+    grid-column: 1 / -1;
+    color: rgba(var(--font-color-light));
+}
+
+#search-results > .result {
+    position: relative;
+    max-width: 400px;
+    max-height: 600px;
+    width: 400px;
+    height: 600px;
+    cursor: pointer;
+
+    transition: var(--transition-time) ease;
+}
+
+#search-results > .result .thumbnail {
+    margin: 0px auto;
+    position: absolute;
+    z-index: 100;
+    border: 3px solid rgb(var(--font-color-light));
+    border-radius: 5px;
+    width: 100%;
+    height: 100%;
+    transition: inherit;
+}
+
+#search-results > .result:hover .thumbnail {
+    filter: brightness(0.5);
+}
+
+#search-results > .result .details {
+    position: absolute;
+    z-index: 200;
+    width: 100%;
+    height: 30%;
+    top: 70%;
+    background: linear-gradient(360deg, black, rgba(0, 0, 0, .4) 80%, transparent);
+    padding: 3px;
+    background-clip: content-box;
+}
+
+#search-results > .result .title {
+    font-size: 32px;
+    color: rgb(var(--font-color-light));
+    position: absolute;
+    bottom: 10px;
+    padding: 0 10px;
+    text-align: center;
+}
+
+#search-results > .result .description {
+    display: none;
+}
+
+#search-results > .result .tooltip {
+    position: absolute;
+    width: 60px;
+    aspect-ratio: 1;
+    right: 10px;
+    top: 10px;
+    z-index: 200;
+
+    transition: inherit;
+}
+
+#search-results > .result:not(:hover) .tooltip {
+    opacity: 0;
+    position: none;
+}
+
+#search-results > .result .tooltip-icon {
+    width: 100%;
+    height: 100%;
+    fill: rgb(var(--font-color-light));
+    
+    transition: inherit;
+}
+
+#search-results > .result .tooltip-icon:hover {
+    fill: rgba(var(--font-color-light), 0.5);
+    cursor: pointer;
 }

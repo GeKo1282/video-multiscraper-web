@@ -43,6 +43,8 @@ class Requester:
 
         self._requests_on_hold = 0
 
+        self._resetter_task = None
+
     @staticmethod
     def get_requester(id: str) -> "Requester":
         return Requester.requesters.get(id)
@@ -66,8 +68,11 @@ class Requester:
              self._requests_minute >= self.max_requests_per_minute or \
              self._requests_second >= self.max_requests_per_second
 
-    async def _request(self, method: str, url: str, *, headers: dict = None, timeout: int = None, retries: int = None,
+    async def _request(self, method: str, url: str, *, headers: dict = None, timeout: int = 10, retries: int = None,
         retry_delay: int = None, backoff_exponent: int = None, proxies: dict = None, data: dict = None, allow_redirects: bool = True, **kwargs) -> aiohttp.ClientResponse:
+            if not self._resetter_task:
+                self._resetter_task = asyncio.create_task(self._reset_counters())
+            
             if self._should_hold():
                 self._requests_on_hold += 1
 
@@ -128,21 +133,21 @@ class Requester:
                          "text": await response.text()
                     }
                 
-    async def get(self, url: str, *, headers: dict = None, timeout: int = None, retries: int = None, retry_delay: int = None,
+    async def get(self, url: str, *, headers: dict = None, timeout: int = 10, retries: int = None, retry_delay: int = None,
         backoff_exponent: int = None, proxies: dict = None, params: dict = None, allow_redirects: bool = True, ssl: bool = True,
         verify_ssl: bool = True, **kwargs):
             return await self._request("GET", url, headers=headers, timeout=timeout, retries=retries, retry_delay=retry_delay,
                 backoff_exponent=backoff_exponent, proxies=proxies, params=params, allow_redirects=allow_redirects, ssl=ssl,
                 verify_ssl=verify_ssl, **kwargs)
     
-    async def post(self, url: str, *, headers: dict = None, timeout: int = None, retries: int = None, retry_delay: int = None,
+    async def post(self, url: str, *, headers: dict = None, timeout: int = 10, retries: int = None, retry_delay: int = None,
         backoff_exponent: int = None, proxies: dict = None, data: dict = None, json: dict = None, allow_redirects: bool = True,
         ssl: bool = True, verify_ssl: bool = True, **kwargs):
             return await self._request("POST", url, headers=headers, timeout=timeout, retries=retries, retry_delay=retry_delay,
                 backoff_exponent=backoff_exponent, proxies=proxies, data=data, json=json, allow_redirects=allow_redirects, ssl=ssl,
                 verify_ssl=verify_ssl, **kwargs)
     
-    async def head(self, url: str, *, headers: dict = None, timeout: int = None, retries: int = None, retry_delay: int = None,
+    async def head(self, url: str, *, headers: dict = None, timeout: int = 10, retries: int = None, retry_delay: int = None,
         backoff_exponent: int = None, proxies: dict = None, data: dict = None, json: dict = None, allow_redirects: bool = True,
         ssl: bool = True, verify_ssl: bool = True, **kwargs):
             return await self._request("HEAD", url, headers=headers, timeout=timeout, retries=retries, retry_delay=retry_delay,
