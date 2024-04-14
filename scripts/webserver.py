@@ -28,7 +28,7 @@ class WebExtender(Extender):
         return send_from_directory(str(Path("static/web/style").absolute()), path)
     
     def media(self, path: str) -> Response:
-        return send_from_directory(str(Path("static/web/media").absolute()), path)
+        return send_from_directory(str(Path("static/media").absolute()), path)
     
     def login(self) -> Response:
         return send_from_directory(str(Path("static/web/").absolute()), "login.html")

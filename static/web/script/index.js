@@ -25,7 +25,32 @@ addLoadEvent(async () => {
     await get_user_info();
     update_user_info();
     assign_handlers();
+    make_sliders();
 })
+
+function make_sliders() {
+    let sliders = document.getElementsByClassName('custom-slider');
+
+    for (let slider of sliders) {
+        let choices = slider.getElementsByClassName('choice');
+        
+        for (let choice of choices) {
+            choice.addEventListener('click', () => {
+                slider.setAttribute('style', '--slider-position: ' + (Array.from(choices).indexOf(choice) + 1) + ';');
+
+                for (let choice of choices) {
+                    choice.classList.remove('selected');
+                }
+
+                choice.classList.add('selected');
+
+                if (choice.hasAttribute('data-callback')) {
+                    eval(choice.getAttribute('data-callback'));
+                }
+            });
+        }
+    }
+}
 
 function switch_page(page_id) {
     if (!page_id.endsWith('-page')) page_id += '-page';
@@ -315,6 +340,8 @@ async function open_content_page(content_uid) {
         page: document.getElementById('content-page'),
 
         title: document.getElementById('content-page').getElementsByClassName('title')[0],
+        service_logo: document.getElementById('content-page').getElementsByClassName('service-logo')[0],
+        origin_url: document.getElementById('content-page').getElementsByClassName('origin-url')[0],
         image: document.getElementById('content-page').getElementsByClassName('image')[0],
         controls: document.getElementById('content-page').getElementsByClassName('controls')[0],
 
@@ -323,7 +350,8 @@ async function open_content_page(content_uid) {
 
         trailer: document.getElementById('content-page').getElementsByClassName('trailer')[0],
         episodes: document.getElementById('content-page').getElementsByClassName('episodes')[0],
-        sources: document.getElementById('content-page').getElementsByClassName('sources')[0]
+        sources: document.getElementById('content-page').getElementsByClassName('sources')[0],
+        similar: document.getElementById('content-page').getElementsByClassName('similar')[0]
     }
 
     let get_data = new Promise((resolve, reject) => {
@@ -347,7 +375,148 @@ async function open_content_page(content_uid) {
         }));
     })
 
-    let page_data = await get_data;
+    let content_data = await get_data;
+    let service_data = await get_service_data(content_data.service);
 
-    console.log(page_data);
+    console.log(content_data, service_data);
+
+    elements.title.innerText = content_data.title;
+    elements.service_logo.src = location.origin + service_data.logo_url;
+    elements.service_logo.dataset.url = service_data.homepage_url;
+    elements.service_logo.setAttribute('onclick', 'open_url(this)');
+    elements.origin_url.innerHTML = `<div class="label">Origin URL: </div><div class="url" onclick="open_url(this)" data-url="${content_data.url}">${content_data.url}</div>`;
+    elements.image.src = content_data.thumbnail;
+    elements.description.innerText = content_data.description.replaceAll('<newline>', '\n');
+
+    elements.tags.innerHTML = '<div class="label">Tags:</div>';
+    for (let tag of content_data.tags) {
+        let tag_element = document.createElement('div');
+        tag_element.classList.add('tag');
+        tag_element.innerText = tag;
+        elements.tags.appendChild(tag_element);
+    }
+
+    if (content_data.trailer) {
+        let video = document.createElement('video');
+        video.src = content_data.trailer;
+        video.controls = true;
+        elements.trailer.appendChild(video);
+    }
+
+    for (let episode of content_data.episodes) {
+        let episode_element = document.createElement('div');
+
+        let details = document.createElement('div');
+        
+        let index = document.createElement('div');
+        let title = document.createElement('div');
+        let origin_url = document.createElement('div');
+        let language = document.createElement('div');
+
+        episode_element.classList.add('episode');
+        
+        details.classList.add('details');
+
+        index.classList.add('index');
+        title.classList.add('title');
+        origin_url.classList.add('origin-url');
+        language.classList.add('language');
+
+        index.innerText = episode.index;
+        title.innerText = episode.title;
+        origin_url.innerText = episode.url;
+        language.innerText = episode.lang.toUpperCase();
+
+        details.appendChild(title);
+        details.appendChild(origin_url);
+
+        episode_element.appendChild(index);
+        episode_element.appendChild(details);
+        episode_element.appendChild(language);
+        
+        elements.episodes.appendChild(episode_element);
+    }
+
+    for (let similar of content_data.similar) {
+        let similar_element = document.createElement('div');
+
+        let thumbnail = document.createElement('img');
+        let title = document.createElement('div');
+
+        similar_element.classList.add('similar-element');
+        thumbnail.classList.add('thumbnail');
+        title.classList.add('title');
+
+        thumbnail.src = similar.thumbnail;
+        title.innerText = similar.title;
+
+        similar_element.appendChild(thumbnail);
+        similar_element.appendChild(title);
+
+        elements.similar.appendChild(similar_element);
+    }
+
+    switch_page('content-page');
+}
+
+async function get_service_data(service_name) {
+    let promise = new Promise((resolve, reject) => {
+        global.websocket.add_onmessage((decrypted, _, self) => {
+            if (decrypted.action != 'send-service-info') {
+                global.websocket.pass_onmessage(self, decrypted, _);
+                return;
+            }
+
+            global.websocket.remove_onmessage(self);
+            resolve(decrypted.data);
+        })
+    });
+
+    global.websocket.send(JSON.stringify({
+        action: 'get-service-info',
+        data: {
+            service_name: service_name
+        }
+    }));
+
+    return await promise;
+}
+
+function open_url(url_or_element) {
+    if (!url_or_element) return;
+
+    let url = typeof url_or_element == 'string' ? url_or_element : url_or_element.dataset.url;
+    let url_window = document.getElementById('url-popup');
+    url_window.getElementsByClassName('url')[0].innerText = url;
+
+    open_url_popup();
+}
+
+function open_url_popup() {
+    document.getElementById('url-popup').classList.add('shown');
+}
+
+function close_url_popup() {
+    document.getElementById('url-popup').classList.remove('shown');
+}
+
+function confirm_url_popup() {
+    let url = document.getElementById('url-popup').getElementsByClassName('url')[0].innerText;
+    window.open(url, '_blank');
+    close_url_popup();
+}
+
+function content_switch_lower(switch_to) {
+    let lower = document.getElementById('content-page').getElementsByClassName('lower')[0];
+
+    let sections = Array.from(lower.getElementsByClassName('containers')[0].children).filter((element) => !element.classList.contains('controls'));
+
+    for (let section of sections) {
+        section.classList.remove('shown');
+    }
+
+    let new_section = document.getElementById('content-page').getElementsByClassName('lower')[0].getElementsByClassName(switch_to.toLowerCase())[0];
+    new_section.classList.add('shown');
+
+    document.getElementById('content-page').scrollTop = lower.getElementsByClassName('containers')[0].offsetTop - document.getElementById('pages-box').clientHeight + Math.min(new_section.clientHeight, 500);
 }

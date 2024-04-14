@@ -66,11 +66,18 @@
                     </div>
 
                     <div class="page window animate" id="content-page">
-                        <div class="title">Title</div>
+                        <div class="button back-button" onclick="switch_page('user-home-page')">
+                            <div class="icon" data-icon="less-than"></div>
+                            Back
+                        </div>
+                        <div class="title"></div>
                         <div class="content">
-                            <div class="upper"></div>
-                            <div class="image"></div>
+                            <img class="image"/>
                             <div class="details">
+                                <div class="source">
+                                    <div class="label">Sourced from:</div>
+                                    <img class="service-logo">
+                                </div>
                                 <div class="controls">
                                     <div class="button save">
                                         <div class="icon" data-icon="bookmark-empty"></div>
@@ -92,15 +99,30 @@
                                         Autoplay
                                     </div>
                                 </div>
+                                <div class="origin-url"></div>
                                 <div class="description"></div>
                                 <div class="tags"></div>
                             </div>
                         </div>
 
                         <div class="lower">
-                            <div class="trailer"></div>
-                            <div class="sources"></div>
-                            <div class="episodes"></div>
+                            <div class="controls slider custom-slider" style="--slider-position: 1;">
+                                <div class="choice" data-callback="content_switch_lower('episodes')">Episodes</div>
+                                <div class="choice" data-callback="content_switch_lower('trailer')">Trailer</div>
+                                <div class="choice" data-callback="content_switch_lower('sources')">Sources</div>
+                                <div class="choice" data-callback="content_switch_lower('similar')">Similar</div>
+                            </div>
+
+                            <div class="containers">
+                                <div class="episodes shown"></div>
+                                <div class="trailer">
+                                    <h1 style="font-size: 64px; color: rgb(var(--font-color)); text-wrap: nowrap;">Sorry, no trailer available.</h1>
+                                </div>
+                                <div class="sources">
+                                    <h1 style="font-size: 64px; color: rgb(var(--font-color)); text-wrap: nowrap;">Nothing to show here (yet).</h1>
+                                </div>
+                                <div class="similar"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -108,7 +130,16 @@
         </div>
 
         <div id="floating-layer" class="layer">
-            <div id="floating-mask"></div>
+            <div id="url-popup" class="window">
+                <div class="header">Redirecting to URL</div>
+
+                <div class="url"></div>
+
+                <div class="controls">
+                    <div class="button" onclick="close_url_popup()">Cancel</div>
+                    <div class="button" onclick="confirm_url_popup()">Continue</div>
+                </div>
+            </div>
         </div>
     </body>
 </html>

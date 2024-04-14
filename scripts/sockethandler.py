@@ -5,7 +5,7 @@ from scripts.helper.socket import WebSocketServer, SocketSession
 from scripts.helper.cipher import RSACipher
 from scripts.helper.database import Database
 from scripts.helper.util import generate_id, sha512
-from scripts.scrappers import OgladajAnime_pl, OA_Movie, OA_Series
+from scripts.scrappers import OgladajAnime_pl, OA_Movie, OA_Series, Service
 from websockets import WebSocketClientProtocol
 from datetime import datetime
 from typing import List, Tuple, Optional
@@ -233,7 +233,7 @@ async def search(session: SocketSession, websocket: WebSocketClientProtocol, dat
             "results": [result.info() for result in await oa.search(query, True)]
         },
         "success": True
-    }, session, unencrypted=True)
+    }, session)
 
 async def get_content_info(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, oa: OgladajAnime_pl, database: Database):
     uid = data['data'].get('content_uid')
@@ -258,5 +258,24 @@ async def get_content_info(session: SocketSession, websocket: WebSocketClientPro
     await WebSocketServer.send(websocket, {
         "action": "send-content-info",
         "data": content.info("JSON", True, True),
+        "success": True
+    }, session)
+
+async def get_service_info(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, services: List[Service]):
+    name = data['data'].get('name') or data['data'].get('service_name')
+
+    if not name:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+    
+    service = next((service for service in services if name in service.codenames), None)
+
+    if not service:
+        await send_error(websocket, session, "Service not found.", action=data.get('action'))
+        return
+    
+    await WebSocketServer.send(websocket, {
+        "action": "send-service-info",
+        "data": service.info(),
         "success": True
     }, session, unencrypted=True)

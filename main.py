@@ -312,6 +312,10 @@ class ProgramController:
             if data.get('action') == 'get-content-info':
                 await get_content_info(session, websocket, data, self.oa, self.database)
                 continue
+
+            if data.get('action') == 'get-service-info':
+                await get_service_info(session, websocket, data, [self.oa])
+                continue
             
             print(f"Received: {data}")
 

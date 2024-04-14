@@ -9,9 +9,13 @@ from scripts.helper.util import sanitize, normalize
 
 class Service:
     def __init__(self, *args, requester: Requester = None, **kwargs) -> None:
+        self.codenames: List[str] = []
         self.base_url: str = None
         self.homepage_url: str = None
         self.search_suggestions_url: str = None
+
+        self.logo_url: str = "/media/unknown-logo.png"
+        self.icon_url: str = "/media/unknown-icon.png"
 
         self.default_headers: dict = {}
 
@@ -41,18 +45,23 @@ class Service:
                 "base_url": self.base_url,
                 "homepage_url": self.homepage_url,
                 "search_suggestions_url": self.search_suggestions_url,
+                "logo_url": self.logo_url,
+                "icon_url": self.icon_url
             }
 
         return f"Base URL: {self.base_url}\n" +\
          f"Homepage URL: {self.homepage_url}\n" +\
-         f"Search Suggestions URL: {self.search_suggestions_url}"
+         f"Search Suggestions URL: {self.search_suggestions_url}" +\
+         f"Logo URL: {self.logo_url}\n" +\
+         f"Icon URL: {self.icon_url}"
 
 class Movie:
-    def __init__(self, url: str, uid: str, title: str = None, thumbnail: str = None, description: str = None,
+    def __init__(self, url: str, uid: str, service: Service, title: str = None, thumbnail: str = None, description: str = None,
      genres: List[str] = None, release_year: int = None, duration: str = None, rating: float = None,
      director: str = None, actors: List[str] = None, trailer_url: str = None, similar: List["Movie"] = None, *args, requester: Requester = None, **kwargs) -> None:
         self.url: str = url
         self.uid: str = uid
+        self.service: Service = service
         self.is_scrapped: bool = False if not all([
             title, thumbnail, description, genres, release_year, duration, rating, director, actors, trailer_url
         ]) else True
@@ -89,6 +98,7 @@ class Movie:
                 "url": self.url,
                 "uid": self.uid,
                 "title": self.title,
+                "type": "movie",
                 "thumbnail": self.thumbnail,
                 "description": self.description,
                 "genres": self.genres,
@@ -96,7 +106,8 @@ class Movie:
                 "duration": self.duration,
                 "rating": self.rating,
                 "director": self.director,
-                "similar": [similar.url for similar in self.similar]
+                "similar": [similar.url for similar in self.similar],
+                "service": self.service.codenames[0]
             }
         
         return f"URL: {self.url}\n" +\
@@ -113,13 +124,14 @@ class Movie:
             f"Similar: {', '.join([movie.url for movie in self.similar])}"
 
 class Series:
-    def __init__(self, url: str, uid: str, title: str = None, thumbnail: str = None, description: str = None,
+    def __init__(self, url: str, uid: str, service: Service, title: str = None, thumbnail: str = None, description: str = None,
      genres: List[str] = None, release_time: Tuple[Union[datetime, int], Union[datetime, int]] = None,
      episodes: Union[dict[str, List["Episode"]], List["Episode"]] = None, 
      similar: List[Union["Series", "Movie"]] = None, *args, requester: Requester = None, **kwargs) -> None:
         
         self.url: str = url
         self.uid: str = uid
+        self.service: Service = service
         self.is_scrapped: bool = False if not all([
             url, uid, title, thumbnail, description, genres, release_time, episodes
         ]) else True
@@ -155,11 +167,13 @@ class Series:
                 "uid": self.uid,
                 "title": self.title,
                 "thumbnail": self.thumbnail,
+                "type": "series",
                 "description": self.description,
                 "genres": self.genres,
                 "release_time": [int(self.release_time[0].timestamp()), (int(self.release_time[1].timestamp()) if self.release_time[1] else None)] if self.release_time else None,
                 "episodes": [episode.uid for episode in self.episodes] if not get_full_episodes else [episode.info() for episode in self.episodes],
-                "similar": [similar.uid for similar in self.similar] if not get_full_similar else [similar.info("JSON", False, False) for similar in self.similar]
+                "similar": [similar.uid for similar in self.similar] if not get_full_similar else [similar.info("JSON", False, False) for similar in self.similar],
+                "service": self.service.codenames[0]
             }
         
         return f"URL: {self.url}\n" +\
@@ -172,7 +186,7 @@ class Series:
             f"Episodes: {', '.join([episode.title for episode in self.episodes])}"
 
 class Episode:
-    def __init__(self, url: str, uid: str, title: str = None, thumbnail: str = None, release_date: datetime = None,
+    def __init__(self, url: str, uid: str, series: Series, title: str = None, thumbnail: str = None, release_date: datetime = None,
         duration: str = None, description: str = None, *args, requester: Requester = None, **kwargs) -> None:
         self.url: str = url
         self.uid: str = uid
@@ -224,7 +238,7 @@ class OA_Movie(Movie):
     def __init__(self, url: str, uid: str, service: "OgladajAnime_pl", id: int = None, pegi: str = None, alternate_titles: List[str] = None,
          tags: List['str'] = None, views: int = None, rating: float = None, length: int = None,
          trailer_url: str = None, *args, **kwargs) -> None:
-        super().__init__(url, uid, *args, **kwargs)
+        super().__init__(url, uid, service, *args, **kwargs)
 
         self.id: int = id
         self.service: "OgladajAnime_pl" = service
@@ -244,7 +258,6 @@ class OA_Movie(Movie):
             return {
                 **super().info("JSON"),
                 "id": self.id,
-                "type": "movie",
                 "pegi": self.pegi,
                 "alternate_titles": self.alternate_titles,
                 "tags": self.tags,
@@ -260,7 +273,7 @@ class OA_Series(Series):
     def __init__(self, url: str, uid: str, service: "OgladajAnime_pl", id: int = None, series_type: str = None, pegi: str = None, alternate_titles: List[str] = None,
          tags: List['str'] = None, views: int = None, rating: float = None, episode_count: int = None, episode_length: int = None,
          trailer_url: str = None, status: str = None, *args, **kwargs) -> None:
-        super().__init__(url, uid, *args, **kwargs)
+        super().__init__(url, uid, service, *args, **kwargs)
 
         if any([not id, not series_type, not pegi, not views, not rating, not status]):
             self.is_scrapped = False
@@ -441,7 +454,6 @@ class OA_Series(Series):
                 **super().info("JSON", get_full_similar, get_full_episodes),
                 "id": self.id,
                 "series_type": self.series_type,
-                "type": "series",
                 "pegi": self.pegi,
                 "alternate_titles": self.alternate_titles,
                 "tags": self.tags,
@@ -456,12 +468,11 @@ class OA_Series(Series):
          f"Type: {self.type}"
     
 class OA_Episode(Episode):
-    def __init__(self, url: str, uid: str, index: int, service: "OgladajAnime_pl", series: OA_Series, title: str, lang: str,
+    def __init__(self, url: str, uid: str, index: int, series: OA_Series, title: str, lang: str,
         duration: str = None,*args, requester: Requester, **kwargs) -> None:
-        super().__init__(url, uid, title, None, None, duration, None, *args, requester=requester, **kwargs)
+        super().__init__(url, uid, series, title, None, None, duration, None, *args, requester=requester, **kwargs)
 
         self.index: int = index
-        self.service: "OgladajAnime_pl" = service
         self.series: OA_Series = series
         self.lang: str = lang
 
@@ -489,11 +500,16 @@ class OgladajAnime_pl(Service):
     def __init__(self, *args, database: Database, search_suggestion_cache_size: int = (1024 * 1024 * 100), **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
+        self.codenames = ["ogladajanime", "oa"]
         self._database: Database = database
 
         self.base_url: str = "https://ogladajanime.pl"
-        self.search_suggestions_url: str = "https://ogladajanime.pl/manager.php?action=get_anime_names"
-        self.anime_url: str = "https://ogladajanime.pl/manager.php?action=anime"
+        self.homepage_url: str = self.base_url
+        self.search_suggestions_url: str = self.base_url + "/manager.php?action=get_anime_names"
+        self.anime_url: str = self.base_url + "/manager.php?action=anime"
+
+        self.logo_url: str = "/media/ogladajanime-logo-full.png"
+        self.icon_url: str = "/media/ogladajanime-icon.png"
 
         self.search_suggestions: List[str] = []
         self.search_suggestions_cache: dict[str, list[str]] = {}

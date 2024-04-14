@@ -132,6 +132,7 @@ z-index
     left: 0;
 
     height: 100%;
+    max-height: 100%;
     width: 100%;
     overflow: auto;
     padding: 10px;
@@ -242,11 +243,14 @@ body.animate #pages-box > .page.animate {
 }
 
 #search-results {
+    --result-width: 280px;
+    --aspect-ratio: 300/420;
+
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--result-width), 1fr));
     justify-items: center;
     column-gap: 10px;
-    row-gap: 80px;
+    row-gap: 50px;
 }
 
 #search-results > .header {
@@ -257,16 +261,12 @@ body.animate #pages-box > .page.animate {
 
 #search-results > .result {
     position: relative;
-    max-width: 400px;
-    max-height: 600px;
-    width: 400px;
-    height: 600px;
+    width: var(--result-width);
+    aspect-ratio: var(--aspect-ratio);
     cursor: pointer;
     border: 3px solid rgb(var(--font-color-light));
     border-radius: 5px;
-
     transition: var(--transition-time) ease;
-
     user-select: none;
 }
 
@@ -287,9 +287,9 @@ body.animate #pages-box > .page.animate {
     position: absolute;
     z-index: 200;
     width: 100%;
-    height: 30%;
-    top: 70%;
-    background: linear-gradient(0deg, black, rgba(0, 0, 0, .4) 80%, transparent);
+    height: 60%;
+    bottom: 0;
+    background: linear-gradient(0deg, black, rgba(0, 0, 0, .5) 80%, transparent);
 }
 
 #search-results > .result .title {
@@ -332,4 +332,45 @@ body.animate #pages-box > .page.animate {
 #search-results > .result .tooltip-icon:hover {
     fill: rgba(var(--font-color-light), 0.5);
     cursor: pointer;
+}
+
+#url-popup {
+    padding: 30px;
+    background: var(--window-background);
+    border: 2px solid rgb(var(--primary-color));
+    border-radius: 5px;
+    gap: 80px !important;
+}
+
+#url-popup > .header {
+    font-size: 48px;
+    color: rgb(var(--font-color));
+}
+
+#url-popup > .url {
+    font-size: 24px;
+    color: rgb(var(--font-color-dark));
+}
+
+#url-popup > .controls {
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+}
+
+#url-popup > .controls > .button {
+    color: rgb(var(--font-color));
+    border: 2px solid rgb(var(--secondary-color));
+    padding: 5px 0;
+    border-radius: 5px;
+    width: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#url-popup > .controls > .button:hover {
+    background: rgba(var(--secondary-color), 0.2);
 }
