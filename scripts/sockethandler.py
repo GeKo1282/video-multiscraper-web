@@ -1,13 +1,17 @@
+import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from scripts.helper.socket import WebSocketServer, SocketSession
 from scripts.helper.cipher import RSACipher
 from scripts.helper.database import Database
 from scripts.helper.util import generate_id, sha512
-from scripts.scrappers import OgladajAnime_pl
+from scripts.scrappers import OgladajAnime_pl, OA_Movie, OA_Series
 from websockets import WebSocketClientProtocol
 from datetime import datetime
 from typing import List, Tuple, Optional
+
+def authorize_user(id: str, token: str, database: Database) -> bool:
+    return bool(database.select("users", ["id"], "id = ? AND token = ?", [id, token]))
 
 async def send_error(websocket: WebSocketClientProtocol, session: SocketSession, error: str, code: int = 0, action: str = None, additional: dict = None):
     # Codes table:
@@ -207,8 +211,17 @@ async def get_search_suggestions(session: SocketSession, websocket: WebSocketCli
         "success": True
     }, session, unencrypted=True)
 
-async def search(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, oa: OgladajAnime_pl):
+async def search(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, oa: OgladajAnime_pl, database: Database):
     query: str = data['data'].get('query')
+    user_id = data['data'].get('user_id', "")
+    token = data['data'].get('token', "")
+
+    if not authorize_user(user_id, token, database):
+        await send_error(websocket, session, "Invalid credentials.", code=111, action=data.get('action'), additional={
+            "success": False
+        })
+        return
+
     if not query:
         await send_error(websocket, session, "Invalid data.", action=data.get('action'))
         return
@@ -217,7 +230,33 @@ async def search(session: SocketSession, websocket: WebSocketClientProtocol, dat
         "action": "send-search-results",
         "data": {
             "query": query,
-            "results": [{**result.info(), "uid": f"oa-{result.id}"} for result in await oa.search(query, timeout=10)]
+            "results": [result.info() for result in await oa.search(query, timeout=10)]
         },
+        "success": True
+    }, session, unencrypted=True)
+
+async def get_content_info(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, oa: OgladajAnime_pl, database: Database):
+    uid = data['data'].get('content_uid')
+    user_id = data['data'].get('user_id', "")
+    token = data['data'].get('token', "")
+
+    if not authorize_user(user_id, token, database):
+        await send_error(websocket, session, "Invalid credentials.", code=111, action=data.get('action'), additional={
+            "success": False
+        })
+        return
+    
+    if not uid:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+    
+    content = oa.get_by_uid(uid, True, True)
+
+    if type(content) in [OA_Movie, OA_Series] and not content.is_scrapped:
+        await content.scrape()
+
+    await WebSocketServer.send(websocket, {
+        "action": "send-content-info",
+        "data": content.info("JSON", True, True),
         "success": True
     }, session, unencrypted=True)

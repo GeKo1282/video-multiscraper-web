@@ -108,25 +108,27 @@ async function login() {
         await sleep(50);
     }
 
-    global.websocket.onmessage = (decrypted, _) => {
+    global.websocket.add_onmessage((decrypted, _, self) => {
         if (decrypted.action != 'get-salt' || !decrypted.success) {
             global.socket_hander(decrypted, _);
             return;
         }
 
-        global.websocket.onmessage = (decrypted, _) => {
+        global.websocket.add_onmessage((decrypted, _, self) => {
             if (decrypted.action != 'send-user-auth' || !decrypted.success) {
-                global.socket_hander(decrypted, _);
+                global.websocket.pass_onmessage(self, decrypted, _);
                 return;
             }
     
-            global.websocket.onmessage = global.socket_hander;
+            global.websocket.remove_onmessage(self);
     
             localStorage.setItem('token', decrypted.data.token);
             localStorage.setItem('user_id', decrypted.data.id);
 
             window.location.href = '/';
-        };
+        });
+
+        global.websocket.remove_onmessage(self);
 
         global.websocket.send(JSON.stringify({
             action: 'get-user-auth',
@@ -135,7 +137,9 @@ async function login() {
                 password: sha512(password, decrypted.data.salt)
             }
         }));
-    }
+    })
+
+    global.websocket.onmessage = 
 
     global.websocket.send(JSON.stringify({
         action: 'get-salt',
@@ -167,17 +171,17 @@ async function register() {
         await sleep(50);
     }
 
-    global.websocket.onmessage = (decrypted, _) => {
+    global.websocket.add_onmessage((decrypted, _, self) => {
         if (decrypted.action != 'send-user-auth' || !decrypted.success) {
-            global.socket_hander(decrypted, _);
+            global.websocket.pass_onmessage(self, decrypted, _);
             return;
         }
 
-        global.websocket.onmessage = global.socket_hander;
+        global.websocket.remove_onmessage(self);
 
         localStorage.setItem('token', decrypted.data.token);
         localStorage.setItem('user_id', decrypted.data.user_id);
-    };
+    });
 
     global.websocket.send(JSON.stringify({
         action: 'register',

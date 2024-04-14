@@ -221,6 +221,8 @@ body {
     cursor: pointer;
 
     transition: var(--transition-time) ease;
+
+    user-select: none;
 }
 
 #search-results > .result .thumbnail {

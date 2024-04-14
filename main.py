@@ -68,13 +68,12 @@ class ProgramController:
         Requester("oa-requester",
             default_headers={
                 "Referer": "https://ogladajanime.pl",
-                "X-Requested-With": "XMLHttpRequest"
+                "X-Requested-With": "XMLHttpRequest",
+                **(json.loads(open("data/oa-headers.json").read()) if Path("data/oa-headers.json").exists() else {})
             },
             max_requests_per_minute=20, max_requests_per_second=20,
             default_user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
         )
-
-        self.oa = OgladajAnime_pl(requester=Requester.get_requester("oa-requester"))
 
         self.database.create_table("users", [
             "id TEXT PRIMARY KEY UNIQUE NOT NULL",
@@ -92,6 +91,37 @@ class ProgramController:
             "deleted BOOLEAN NOT NULL DEFAULT FALSE",
             "suspended BOOLEAN NOT NULL DEFAULT FALSE"
         ])
+
+        self.database.create_table("content", [
+            "uid TEXT PRIMARY KEY UNIQUE NOT NULL",
+            "origin_url TEXT NOT NULL",
+
+            # For search purposes
+            "searchable BOOLEAN NOT NULL DEFAULT TRUE",
+            "source TEXT NOT NULL", #eg. ogladajanime, netflix, hulu
+            "type TEXT NOT NULL", #eg. movie, series, episode, thumbnail
+            "weight REAL NOT NULL",
+            "title TEXT NOT NULL",
+
+            # actual content entry, because it might differ from service to service
+            "meta TEXT NOT NULL DEFAULT '{}'",
+        ])
+
+        self.database.create_table("media", [
+            "id INTEGER PRIMARY KEY AUTOINCREMENT",
+            "refer_id TEXT REFERENCES content(uid)",
+            
+            "media_type TEXT NOT NULL", #eg. video, image, audio
+            "media_format TEXT NOT NULL",
+            "media_name TEXT NOT NULL", #eg. thumbnail, 1080p, opening, etc. Used for geting through url.
+            "media_id INT NOT NULL", #for when there is more than one media of the same type for the same content, eg. multiple resolutions or thumbnails.
+            # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}]: /media/1234/thumbnail, /media/1234/opening.mp4, /media/1234/1080p.mp4, /media/1234/thumbnail.jpg/2
+            
+            "origin_url TEXT DEFAULT NULL",
+            "file BLOB DEFAULT NULL",
+        ])
+
+        self.oa = OgladajAnime_pl(database=self.database, requester=Requester.get_requester("oa-requester"))
 
     def load_settings(self, settings_path: str = "data/settings.json") -> dict:
         # Loads, checks if valid and corrects settings if necessary
@@ -276,7 +306,11 @@ class ProgramController:
                 continue
 
             if data.get('action') == 'search':
-                await search(session, websocket, data, self.oa)
+                await search(session, websocket, data, self.oa, self.database)
+                continue
+
+            if data.get('action') == 'get-content-info':
+                await get_content_info(session, websocket, data, self.oa, self.database)
                 continue
             
             print(f"Received: {data}")

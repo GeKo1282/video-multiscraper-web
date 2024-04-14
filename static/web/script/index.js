@@ -120,7 +120,9 @@ function assign_handlers() {
             await global.websocket.send(JSON.stringify({
                 action: 'search',
                 data: {
-                    query: value
+                    query: value,
+                    user_id: global.user.info.id,
+                    token: global.user.info.token
                 }
             }));
         }
@@ -257,6 +259,44 @@ function update_search_results(results_json) {
     }
 }
 
-function open_content_page(content_id) {
-    console.log(content_id);
+async function open_content_page(content_uid) {
+    let elements = {
+        page: document.getElementById('content-page'),
+
+        title: document.getElementById('content-page').getElementsByClassName('title')[0],
+        image: document.getElementById('content-page').getElementsByClassName('image')[0],
+        controls: document.getElementById('content-page').getElementsByClassName('controls')[0],
+
+        description: document.getElementById('content-page').getElementsByClassName('description')[0],
+        tags: document.getElementById('content-page').getElementsByClassName('tags')[0],
+
+        trailer: document.getElementById('content-page').getElementsByClassName('trailer')[0],
+        episodes: document.getElementById('content-page').getElementsByClassName('episodes')[0],
+        sources: document.getElementById('content-page').getElementsByClassName('sources')[0]
+    }
+
+    let get_data = new Promise((resolve, reject) => {
+        global.websocket.add_onmessage((decrypted, _, self) => {
+            if (decrypted.action != 'send-content-info') {
+                global.websocket.pass_onmessage(self, decrypted, _);
+                return;
+            }
+
+            global.websocket.remove_onmessage(self);
+            resolve(decrypted.data);
+        })
+
+        global.websocket.send(JSON.stringify({
+            action: 'get-content-info',
+            data: {
+                content_uid: content_uid,
+                user_id: global.user.info.id,
+                token: global.user.info.token
+            }
+        }));
+    })
+
+    let page_data = await get_data;
+
+    console.log(page_data);
 }

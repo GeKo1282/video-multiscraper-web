@@ -1,0 +1,105 @@
+#content-page {
+    height: 100%;
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    flex-direction: column;
+}
+
+#content-page > .title {
+    width: 100%;
+    font-size: 64px;
+    color: var(--font-color-light);
+
+    display: flex;
+    align-items: center;
+    justify-content: start;
+}
+
+#content-page > .content {
+    flex: 1 1 1px;
+}
+
+#content-page .upper {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    gap: 10px;
+}
+
+#content-page .upper .image {
+    height: 600px;
+    max-width: 400px;
+}
+
+#content-page .upper .details {
+    flex: 1 1 1px;
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#content-page .upper .details .controls {
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    width: min-content;
+}
+
+#content-page .upper .details .controls .button {
+    width: 300px;
+    height: 50px;
+    background-color: rgb(var(--color-primary));
+    color: var(--font-color-light);
+    font-size: 24px;
+    border: 2px solid rgb(var(--color-primary));
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 10px;
+}
+
+#content-page .upper .details .controls .button:hover {
+    background-color: rgb(var(--color-secondary));
+}
+
+#content-page .upper .details .description {
+    width: 100%;
+    font-size: 24px;
+    color: var(--font-color-light);
+}
+
+#content-page .upper .details .tags {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    gap: 10px;
+}
+
+#content-page .upper .details .tags .tag {
+    background-color: rgb(var(--color-primary));
+    color: var(--font-color-light);
+    font-size: 24px;
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+#content-page .lower > *:empty {
+    display: none;
+}
+
+#content-page .lower .trailer {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    gap: 10px;
+}

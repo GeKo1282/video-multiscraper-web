@@ -35,3 +35,9 @@ def sha512(data: Union[str, bytes], salt: Union[str, bytes] = None) -> str:
 
 def get_user_agents() -> List[str]:
     return json.loads(requests.get("https://cdn.jsdelivr.net/gh/microlinkhq/top-user-agents@master/src/index.json").text)
+
+def sanitize(string: str) -> str:
+    return string.replace("\t", "").strip("\n").strip()
+
+def normalize(string: str):
+    return string.replace(" ", "-").lower()
