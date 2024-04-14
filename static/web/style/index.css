@@ -4,7 +4,7 @@ body {
 
 #app-topbar {
     position: relative;
-    z-index: 1;
+    z-index: 200;
     width: 100%;
     max-width: 100%;
     height: var(--topbar-height);
@@ -61,9 +61,8 @@ body {
 
 #app-topbar .profile-scrolldown {
     position: absolute;
-    top: 140%;
-    left: 50%;
-    transform: translateX(-50%);
+    top: calc(100% + 50px);
+    right: 0;
 
     z-index: 1;
     opacity: 1;
@@ -104,7 +103,7 @@ body {
 #app-topbar .profile-scrolldown .entry.logout {
     color: red;
 }
-
+z-index
 #app-topbar .profile-scrolldown .entry:hover {
     background: rgba(var(--primary-color), 0.2);
     cursor: pointer;
@@ -211,7 +210,7 @@ body.animate #pages-box > .page.animate {
     gap: 10px;
 }
 
-#search-bar .search-suggestions:not(:has(div)) {
+#search-bar .search-suggestions:not(.shown) {
     opacity: 0;
     pointer-events: none;
 }
@@ -263,6 +262,8 @@ body.animate #pages-box > .page.animate {
     width: 400px;
     height: 600px;
     cursor: pointer;
+    border: 3px solid rgb(var(--font-color-light));
+    border-radius: 5px;
 
     transition: var(--transition-time) ease;
 
@@ -273,8 +274,6 @@ body.animate #pages-box > .page.animate {
     margin: 0px auto;
     position: absolute;
     z-index: 100;
-    border: 3px solid rgb(var(--font-color-light));
-    border-radius: 5px;
     width: 100%;
     height: 100%;
     transition: inherit;
@@ -290,9 +289,7 @@ body.animate #pages-box > .page.animate {
     width: 100%;
     height: 30%;
     top: 70%;
-    background: linear-gradient(360deg, black, rgba(0, 0, 0, .4) 80%, transparent);
-    padding: 3px;
-    background-clip: content-box;
+    background: linear-gradient(0deg, black, rgba(0, 0, 0, .4) 80%, transparent);
 }
 
 #search-results > .result .title {

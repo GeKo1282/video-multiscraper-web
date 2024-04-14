@@ -24,7 +24,6 @@ addLoadEvent(async () => {
     await initialize_websocket_communications(global.default_socket_hander);
     await get_user_info();
     update_user_info();
-    assign_clicks();
     assign_handlers();
 })
 
@@ -87,21 +86,11 @@ function update_user_info() {
     }
 }
 
-function assign_clicks() {
-    let events = {
-        '#user-profile-box': {
-            'click': switch_user_menu
-        }
-    }
-
-    for (let selector of Object.keys(events)) {
-        for (let event of Object.keys(events[selector])) {
-            document.querySelector(selector).addEventListener(event, events[selector][event]);
-        }
-    }
-}
-
 function assign_handlers() {
+    document.getElementById('user-profile-box').onclick = (event) => {
+        if (document.getElementById('user-profile-box').getElementsByClassName('profile-scrolldown')[0].contains(event.target)) return;
+        switch_user_menu();
+    }
     document.getElementById('search-bar').getElementsByClassName('search-input')[0].addEventListener('keyup', get_search_suggestions);
     document.getElementById('search-bar').getElementsByClassName('search-input')[0].addEventListener('keydown', async (event) => {
         if (event.key == 'Enter') {
@@ -143,10 +132,8 @@ async function search() {
     let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
 
     global.websocket.add_onmessage((decrypted, _, self) => {
-        if (decrypted.action != 'search-results') global.websocket.pass_onmessage(self, decrypted, _);
+        if (decrypted.action != 'send-search-results') {global.websocket.pass_onmessage(self, decrypted, _); return;}
         
-
-        console.log(decrypted);
         update_search_results(decrypted.data);
         switch_page('search-results');
         global.websocket.remove_onmessage(self);
@@ -209,8 +196,22 @@ function hide_user_menu() {
     document.getElementById('user-profile-box').getElementsByClassName('profile-scrolldown')[0].classList.remove('shown');
 }
 
-function show_user_menu() {
+function show_user_menu(add_callback = true) {
     document.getElementById('user-profile-box').getElementsByClassName('profile-scrolldown')[0].classList.add('shown');
+
+    if (!add_callback) return;
+
+    let old_callback = document.onclick;
+
+    document.onclick = (event) => {
+        if (old_callback) old_callback(event);
+
+        if (document.getElementById('user-profile-box').contains(event.target)) return;
+
+        hide_user_menu();
+
+        document.onclick = old_callback;
+    }
 }
 
 function switch_user_menu() {
@@ -221,8 +222,9 @@ function switch_user_menu() {
     }
 }
 
-function update_search_suggestions(suggestions) {
+function update_search_suggestions(suggestions, assign_handler = true) {
     let suggestions_box = document.getElementById('search-bar').getElementsByClassName('search-suggestions')[0];
+    if (suggestions.length == 0) { suggestions_box.classList.remove('shown'); return; }
     suggestions_box.innerHTML = '';
 
     for (let suggestion of suggestions) {
@@ -235,6 +237,21 @@ function update_search_suggestions(suggestions) {
             search();
         });
         suggestions_box.appendChild(suggestion_element);
+    }
+
+    suggestions_box.classList.add('shown');
+
+    if (!assign_handler) return;
+
+    let old_callback = document.onclick;
+
+    document.onclick = (event) => {
+        if (old_callback) old_callback(event);
+
+        if (document.getElementById('search-bar').contains(event.target)) return;
+
+        update_search_suggestions([]);
+        document.onclick = old_callback;
     }
 }
 
