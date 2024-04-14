@@ -236,10 +236,8 @@ class OA_Movie(Movie):
         self.length: int = length
         self.trailer_url: str = trailer_url
 
-    async def scrape(self) -> None:
-        soup = bs4.BeautifulSoup((await self.requester.post(self.service.anime_url, data=f"id={self.id}"))['text'], "html.parser")
-
-        open("movie.html", "w").write(soup.prettify())
+    async def scrape(self, *args) -> None:
+        pass
 
     def info(self, type: Union[Literal['printable'], Literal['JSON']] = "JSON") -> dict:
         if type.lower() == "json":
@@ -286,7 +284,7 @@ class OA_Series(Series):
             "Content-Length": str(len(data)),
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "Referer": self.url,
-        }, data=data))['text'])['data'], "html.parser")
+        }, data=data, allow_redirects=False))['text'])['data'], "html.parser")
 
         meta_container = soup.find("h4", attrs={"id": "anime_name_id"}).parent
 
@@ -294,7 +292,7 @@ class OA_Series(Series):
         self.alternate_titles = meta_container.find("i").text.split("|")
         self.series_type, self.pegi, views = [sanitize(element.text) for element in meta_container.find("div").find_all("span")]
         self.views = int(views.replace(" ", ""))
-        self.description = sanitize(meta_container.find("p").text.replace("<br>", "\n"))
+        self.description = sanitize(meta_container.find("p").text.replace("<br>", "<newline>").replace("<br/>", "<newline>").replace("\n", "<newline>"))
         episode_count, episode_time, status, emission_start, emission_end = [*[sanitize(container.text.replace(container.find("b").text, "")) for container in meta_container.find_all("div", recursive=False)[-1].find("div").find_all("p", recursive=False)], None][:5]
         self.episode_count = int(episode_count)
         self.episode_length = int(episode_time.split(" ")[0]) * 60
@@ -539,7 +537,7 @@ class OgladajAnime_pl(Service):
                 series=series,
                 title=content[2],
                 requester=self.requester,
-                **json.loads(content[3])
+                **{key: value for key, value in json.loads(content[3]).items() if key not in ["series"]}
             )
         
         series_data: dict = json.loads(content[3])
@@ -588,7 +586,7 @@ class OgladajAnime_pl(Service):
 
         return to_return
 
-    async def search(self, query: str, scrape: bool = False, timeout: int = 10) -> list[Union[OA_Movie, OA_Series]]:
+    async def search(self, query: str, scrape: bool = False, force_scrape: bool = False) -> list[Union[OA_Movie, OA_Series]]:
         def scrape_children(children: bs4.element.Tag) -> Union[OA_Movie, OA_Series]:    
             media_type = normalize(sanitize(children.find("span", class_="badge").text))
             content = (OA_Movie if media_type == "movie" else OA_Series)(
@@ -651,6 +649,6 @@ class OgladajAnime_pl(Service):
            results.append(result)
 
         if scrape:
-            await asyncio.gather(*[media.scrape(False) for media in results])
+            await asyncio.gather(*[media.scrape(False) for media in results if not force_scrape and not self._database.select("content", ["uid"], "uid = ?", [media.uid])])
 
         return results

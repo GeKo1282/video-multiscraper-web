@@ -230,7 +230,7 @@ async def search(session: SocketSession, websocket: WebSocketClientProtocol, dat
         "action": "send-search-results",
         "data": {
             "query": query,
-            "results": [result.info() for result in await oa.search(query, timeout=10)]
+            "results": [result.info() for result in await oa.search(query, True)]
         },
         "success": True
     }, session, unencrypted=True)

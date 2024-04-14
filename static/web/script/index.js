@@ -105,28 +105,61 @@ function assign_handlers() {
     document.getElementById('search-bar').getElementsByClassName('search-input')[0].addEventListener('keyup', get_search_suggestions);
     document.getElementById('search-bar').getElementsByClassName('search-input')[0].addEventListener('keydown', async (event) => {
         if (event.key == 'Enter') {
-            let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
-            
-            global.websocket.add_onmessage((decrypted, _, self) => {
-                if (decrypted.action != 'search-results') global.websocket.pass_onmessage(self, decrypted, _);
-                
+            event.preventDefault();
+            update_search_suggestions([]);
+            if (document.activeElement == document.getElementById('search-bar').getElementsByClassName('search-input')[0]) document.activeElement.blur();
+            await search();
+        }
 
-                console.log(decrypted);
-                update_search_results(decrypted.data);
-                switch_page('search-results');
-                global.websocket.remove_onmessage(self);
-            });
+        if (event.key == 'ArrowDown' || event.key == 'ArrowUp') {
+            event.preventDefault();
+            let suggestions = document.getElementById('search-bar').getElementsByClassName('search-suggestions')[0].getElementsByClassName('suggestion');
+            if (suggestions.length == 0) return;
+
+            let search_input = document.getElementById('search-bar').getElementsByClassName('search-input')[0];
+            let selected = document.getElementById('search-bar').getElementsByClassName('search-suggestions')[0].getElementsByClassName('selected')[0];
             
-            await global.websocket.send(JSON.stringify({
-                action: 'search',
-                data: {
-                    query: value,
-                    user_id: global.user.info.id,
-                    token: global.user.info.token
-                }
-            }));
+            let index = selected ?  Array.from(suggestions).indexOf(selected) : (event.key == 'ArrowDown' ? suggestions.length + 2 : -2);
+            if (event.key == 'ArrowDown') {
+                index++;
+            } else {
+                index--;
+            }
+
+            if (index < 0) index = suggestions.length - 1;
+            if (index >= suggestions.length) index = 0;
+
+            for (let suggestion of suggestions) {
+                suggestion.classList.remove('selected');
+            }
+
+            suggestions[index].classList.add('selected');
+            search_input.value = suggestions[index].innerText;
         }
     });
+}
+
+async function search() {
+    let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
+
+    global.websocket.add_onmessage((decrypted, _, self) => {
+        if (decrypted.action != 'search-results') global.websocket.pass_onmessage(self, decrypted, _);
+        
+
+        console.log(decrypted);
+        update_search_results(decrypted.data);
+        switch_page('search-results');
+        global.websocket.remove_onmessage(self);
+    });
+    
+    await global.websocket.send(JSON.stringify({
+        action: 'search',
+        data: {
+            query: value,
+            user_id: global.user.info.id,
+            token: global.user.info.token
+        }
+    }));
 }
 
 async function get_search_suggestions(event) {
@@ -199,6 +232,7 @@ function update_search_suggestions(suggestions) {
         suggestion_element.addEventListener('click', () => {
             document.getElementById('search-bar').getElementsByClassName('search-input')[0].value = suggestion;
             update_search_suggestions([]);
+            search();
         });
         suggestions_box.appendChild(suggestion_element);
     }

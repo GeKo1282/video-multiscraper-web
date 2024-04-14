@@ -117,7 +117,7 @@ class ProgramController:
             "media_id INT NOT NULL", #for when there is more than one media of the same type for the same content, eg. multiple resolutions or thumbnails.
             # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}]: /media/1234/thumbnail, /media/1234/opening.mp4, /media/1234/1080p.mp4, /media/1234/thumbnail.jpg/2
             
-            "origin_url TEXT DEFAULT NULL",
+            "origin_url TEXT UNIQUE DEFAULT NULL",
             "file BLOB DEFAULT NULL",
         ])
 

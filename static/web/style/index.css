@@ -4,9 +4,12 @@ body {
 
 #app-topbar {
     position: relative;
+    z-index: 1;
     width: 100%;
     max-width: 100%;
     height: var(--topbar-height);
+    min-height: var(--topbar-height);
+    max-height: var(--topbar-height);
     left: 0;
     top: 0;
 
@@ -21,6 +24,13 @@ body {
     color: rgb(var(--font-color-light));
 
     box-shadow: 0px 5px 5px -4px var(--window-shadow);
+}
+
+#pages-box {
+    position: absolute;
+    top: var(--topbar-height);
+    height: calc(100% - var(--topbar-height));
+    width: 100%;
 }
 
 #app-topbar > * {
@@ -117,6 +127,28 @@ body {
     border-radius: 50%;
 }
 
+#pages-box > .page {
+    position: absolute;
+    top: 0;
+    left: 0;
+
+    height: 100%;
+    width: 100%;
+    overflow: auto;
+    padding: 10px;
+
+    opacity: 1;
+}
+
+body.animate #pages-box > .page.animate {
+    transition: var(--transition-time) ease;
+}
+
+#pages-box > .page:not(.shown) {
+    opacity: 0;
+    pointer-events: none;
+}
+
 #search-bar {
     height: 100%;
     flex: 1 1 1px;
@@ -193,9 +225,21 @@ body {
     border-radius: 5px;
 }
 
+#search-bar .search-suggestions .suggestion.selected {
+    background: rgba(var(--primary-color), 0.2);
+}
+
 #search-bar .search-suggestions .suggestion:hover {
     background: rgba(var(--primary-color), 0.2);
     cursor: pointer;
+}
+
+#search-results-page {
+    padding: 50px 10px !important;
+}
+
+#search-results-page > .back-button {
+    top: 20px;
 }
 
 #search-results {

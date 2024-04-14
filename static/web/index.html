@@ -1,40 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Homepage</title>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Homepage</title>
 
-    <link rel="stylesheet" href="style/root.css">
-    <link rel="stylesheet" href="style/shared.css">
-    <link rel="stylesheet" href="style/index.css">
-    <link rel="stylesheet" href="style/index/content.css">
-    
-    <script src="script/helper/forge.min.js"></script>
-    <script src="script/helper/aes.js"></script>
-    <script src="script/helper/rsa.js"></script>
-    <script src="script/helper/socket.js"></script>
+        <link rel="stylesheet" href="style/root.css" />
+        <link rel="stylesheet" href="style/shared.css" />
+        <link rel="stylesheet" href="style/index.css" />
+        <link rel="stylesheet" href="style/index/content.css" />
 
-    <script src="script/helper/util.js"></script>
-    <script src="script/helper/root.js"></script>
-    <script src="script/index.js" defer></script>
+        <script src="script/helper/forge.min.js"></script>
+        <script src="script/helper/aes.js"></script>
+        <script src="script/helper/rsa.js"></script>
+        <script src="script/helper/socket.js"></script>
 
-    <style>
-        .profile-image {
-            background: var(--image-url);
-        }
-    </style>
-</head>
-<body>
-    <div id="app-layer" class="layer">
-        <div class="content">
-            <div class="content-background" style="display: flex;flex-direction: column;">
+        <script src="script/helper/util.js"></script>
+        <script src="script/helper/root.js"></script>
+        <script src="script/index.js" defer></script>
+
+        <style>
+            .profile-image {
+                background: var(--image-url);
+            }
+        </style>
+    </head>
+    <body class="animate">
+        <div id="app-layer" class="layer">
+            <div class="content">
                 <div id="app-topbar">
                     <div class="title">Titile (lol)</div>
 
                     <div id="search-bar">
                         <div class="icon" data-icon="search"></div>
-                        <input type="text" class="search-input" placeholder="Search...">
+                        <input type="text" class="search-input" placeholder="Search..." />
                         <div class="icon clear-icon hidden" data-icon="x"></div>
 
                         <div class="search-suggestions"></div>
@@ -55,23 +54,26 @@
                     </div>
                 </div>
 
-                <div class="page window animate shown" id="user-home-page">
+                <div id="pages-box">                    
+                    <div class="page window animate shown" id="user-home-page"></div>
 
-                </div>
+                    <div class="page window animate" id="search-results-page">
+                        <div class="button back-button" onclick="switch_page('user-home-page')">
+                            <div class="icon" data-icon="less-than"></div>
+                            Back
+                        </div>
+                        <div id="search-results"></div>
+                    </div>
 
-                <div class="page window animate" id="search-results-page">
-                    <div id="search-results"></div>
-                </div>
-
-                <div class="page window animate" id="content-page">
-                    <div class="title">Title</div>
-                    <div class="content">
-                        <div class="upper"></div>
+                    <div class="page window animate" id="content-page">
+                        <div class="title">Title</div>
+                        <div class="content">
+                            <div class="upper"></div>
                             <div class="image"></div>
                             <div class="details">
                                 <div class="controls">
                                     <div class="button save">
-                                        <div class="icon" data-icon="bookmark_empty"></div>
+                                        <div class="icon" data-icon="bookmark-empty"></div>
                                         Save to my list
                                     </div>
 
@@ -104,10 +106,9 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <div id="floating-layer" class="layer">
-        <div id="floating-mask"></div>
-    </div>
-</body>
+        <div id="floating-layer" class="layer">
+            <div id="floating-mask"></div>
+        </div>
+    </body>
 </html>
