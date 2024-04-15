@@ -1,11 +1,12 @@
-import asyncio, json, bs4
+import asyncio, json, bs4, html,re
+from bs4 import BeautifulSoup
 from asyncio import Task
-from typing import Optional, List, Tuple, Union, Literal
+from typing import Optional, List, Tuple, Union, Literal, AsyncGenerator, Dict, Coroutine
 from datetime import datetime
-from urllib.parse import quote as urlquote, unquote as urlunquote
+from urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit, urlunsplit
 from scripts.helper.requester import Requester
 from scripts.helper.database import Database
-from scripts.helper.util import sanitize, normalize
+from scripts.helper.util import sanitize, normalize, deduplicate
 
 class Service:
     def __init__(self, *args, requester: Requester = None, **kwargs) -> None:
@@ -23,6 +24,11 @@ class Service:
             "Referer": self.base_url,
             "X-Requested-With": "XMLHttpRequest"
         }, max_requests_per_minute=20, max_requests_per_second=20)
+
+    def get_by_uid(self, uid: str, get_similar: bool = False, get_episodes: bool = False, series: "Series" = None) -> Union["Series", "Movie", "Episode"]:
+        '''
+            This method is intended to be overwritten by devired classes.
+        '''
 
     async def get_search_suggestions(self, hint: str = None, limit: int = 10, *, user_agent: Optional[str] = None, headers: Optional[dict] = None) -> List[str]:
         '''
@@ -234,6 +240,205 @@ class Episode:
             f"Duration: {self.duration}\n" +\
             f"Description: {self.description}"
 
+class SourceExtractor:
+    @classmethod
+    async def scrape(cls, url: str, headers: dict = None, *args,
+     requester_id: str = "main", **kwargs) -> Tuple[str, List[Union[Tuple[Dict, str], str]]]:
+        '''
+            Intended to be overwritten by subclasses.
+        '''
+
+    @staticmethod
+    def extract_m3u8(url: str, contents: str) -> Tuple[str, List[Tuple[dict, str]]]:
+        def extract_properties(string: str) -> dict:
+            properties = {}
+            current_key = ""
+            current_property = ""
+            onkey = True
+            escaped = False
+            for character in string:
+                if character == "\"":
+                    escaped = not escaped
+                    continue
+
+                if character == "=" and not escaped:
+                    onkey = False
+                    continue
+
+                if onkey:
+                    current_key += character
+                    continue
+
+                if character == "," and not escaped:
+                    properties[current_key] = current_property
+                    current_key = ""
+                    current_property = ""
+                    onkey = True
+                    continue
+
+                current_property += character
+
+            properties[current_key] = current_property
+
+            return {key.lower().replace("-", ""): value for key, value in properties.items()}
+
+        file_type = "index"
+        lines = []
+        for index, line in enumerate(contents.split("\n")):
+            if line.startswith("#EXT-X-STREAM-INF"):
+                file_type = "playlist"
+            
+            if line.startswith("#EXT-X-STREAM-INF"):
+                property_list = extract_properties(line.replace("#EXT-X-STREAM-INF:", ""))
+                lines.append(({
+                    "bandwidth": property_list.get('bandwidth'),
+                    "resolution": property_list.get('resolution'),
+                    "framerate": property_list.get('framerate'),
+                    "codecs": property_list.get('codecs'),
+                }, contents.split("\n")[index + 1]))
+
+            if file_type != "playlist" and not line.startswith("#"):
+                lines.append(line)
+
+        return file_type, lines
+
+    @staticmethod
+    def pythonize_json_string(string: str) -> dict:
+        string = string.replace("'", '"')
+        string = string[1:] if string.startswith("{") else string
+        string = string[:-1] if string.endswith("}") else string
+        out_dict = {}
+        current_key = ""
+        current_value = ""
+        onkey = True
+        escaped = False
+        for char in string:
+            if char == '"':
+                escaped = not escaped
+                continue
+
+            if char == ":" and not escaped:
+                onkey = False
+                continue
+
+            if onkey:
+                current_key += char
+                continue
+
+            if char == "," and not escaped:
+                out_dict[current_key] = current_value
+                current_key = ""
+                current_value = ""
+                onkey = True
+                continue
+
+            current_value += char
+
+        out_dict[current_key] = current_value
+
+        return {key: value for key, value in out_dict.items()}
+
+class CDA(SourceExtractor):
+    def __init__(self) -> None:
+        pass
+
+    @staticmethod
+    async def source_extractor(url: str, proxy = None, *, get_all_qualities: bool = False, get_top_quality: bool = True,
+     get_quality_info: bool = True, prefer_quality: Union[int, str] = None) -> Dict[str, str]:
+        
+        async def get_sources(urllist: Union[List[Tuple[str, Optional[Union[str, int]]]], Tuple[str, Optional[Union[str, int]]]]):
+            if not isinstance(urllist, list):
+                urllist = [urllist]
+
+            for url, quality in urllist:
+                if type(quality) is int:
+                    quality = str(quality)
+
+                if quality and not quality.endswith("p"):
+                    quality += "p"
+
+                if quality:
+                    new_url = list(urlsplit(url))
+                    new_url[3] = "&wersja=" + quality
+                    new_url = urlunsplit(new_url)
+
+                urllist[urllist.index((url, quality))] = new_url if quality else url
+
+            cookie = {
+                "cda.player": "html5",
+            }
+            
+            headers = {
+                "Cookie": "; ".join([f"{key}={value}" for key, value in cookie.items()])
+            }
+
+            requests: List[Coroutine] = []
+
+            for url in urllist:
+                requests.append(Requester.get_requester('cda.main').get(url, headers=headers, proxies=({"http": proxy} if proxy else None)))
+
+            responses = await asyncio.gather(*requests)
+
+            return [r['text'] for r in responses]
+                 
+        def get_playerdata(soup: BeautifulSoup) -> dict:
+            return json.loads(html.unescape(soup.find("div", id=re.compile(r"^mediaplayer.*$")).get("player_data")))['video']
+        
+        def decrypt_file(a):            
+            for p in ('_XDDD', '_CDA', '_ADC', '_CXD', '_QWE', '_Q5', '_IKSDE'):
+                a = a.replace(p, '')
+            a = urlunquote(a)
+            b = []
+            for c in a:
+                f = c if type(c) is int else ord(c)
+                b.append(chr(33 + (f + 14) % 94) if 33 <= f and 126 >= f else chr(f))
+            a = ''.join(b)
+            a = a.replace('.cda.mp4', '')
+            for p in ('.2cda.pl', '.3cda.pl'):
+                a = a.replace(p, '.cda.pl')
+            if '/upstream' in a:
+                a = a.replace('/upstream', '.mp4/upstream')
+                return 'https://' + a
+            return 'https://' + a + '.mp4'
+
+        if not any(url.replace("https://", "").replace("http://", "").replace("www.", "").startswith(prefix) for prefix in ["cda.pl", "ebd.cda.pl", "embed.cda.pl"]):
+            return
+        
+        soup = BeautifulSoup((await get_sources((url, prefer_quality)))[0], "html.parser")
+        playerdata = get_playerdata(soup)
+        
+        quality_dict: Dict[str, str] = {(str(key) + "p"): playerdata['qualities'][(str(key) + "p")] for key in list(reversed(sorted([int(key.replace("p", "")) for key in playerdata['qualities'].keys()])))}
+        quality_dict[list(quality_dict.keys())[list(quality_dict.values()).index(playerdata['quality'])]] =  decrypt_file(playerdata['file'])
+
+        requests = []
+
+        if get_all_qualities:
+            requests = []
+
+            for quality in quality_dict.keys():
+                if quality in quality_dict.keys() and any(quality_dict[quality].startswith(prefix) for prefix in ["https://", "http://"]):
+                    continue
+
+                requests.append((url, quality))
+
+            responses = get_sources(requests)
+
+            for response in responses:
+                playerdata = get_playerdata(BeautifulSoup(response, "html.parser"))
+                quality_dict[list(quality_dict.keys())[list(quality_dict.values()).index(playerdata['quality'])]] = decrypt_file(playerdata['file'])
+
+        if get_top_quality:
+            top_quality = list(quality_dict.keys())[0]
+            if top_quality not in list(quality_dict.keys()) or not any(quality_dict[top_quality].startswith(prefix) for prefix in ["https://", "http://"]):
+                quality_dict[top_quality] = decrypt_file(get_playerdata(BeautifulSoup(get_sources((url, top_quality))[0], "html.parser"))['file'])
+            
+        qualities = list(quality_dict.keys())
+
+        quality_dict = {key: value for key, value in quality_dict.items() if any(value.startswith(prefix) for prefix in ["https://", "http://"])}
+
+        return {**quality_dict, "duration": int(playerdata['duration']), **({"qualities": qualities} if get_quality_info else {})}
+
+
 class OA_Movie(Movie):
     def __init__(self, url: str, uid: str, service: "OgladajAnime_pl", id: int = None, pegi: str = None, alternate_titles: List[str] = None,
          tags: List['str'] = None, views: int = None, rating: float = None, length: int = None,
@@ -385,6 +590,7 @@ class OA_Series(Series):
         for episode in soup.find("ul", id="ep_list").find_all("li"):
             # TODO: Sometimes, if episodes are not yet released, they are empty. Should be handled.
             episodes.append(OA_Episode(
+                id=episode["ep_id"],
                 uid=f"oa-{episode['ep_id']}",
                 url=self.url.removesuffix("/") + "/" + episode["value"],
                 index=float(episode["value"]),
@@ -468,35 +674,189 @@ class OA_Series(Series):
         
         return super().info("printable", get_full_similar) + f"ID: {self.id}\n" +\
          f"Type: {self.type}"
-    
-class OA_Episode(Episode):
-    def __init__(self, url: str, uid: str, index: int, series: OA_Series, title: str, lang: str,
-        duration: str = None,*args, requester: Requester, **kwargs) -> None:
-        super().__init__(url, uid, series, title, None, None, duration, None, *args, requester=requester, **kwargs)
 
-        self.index: int = index
-        self.series: OA_Series = series
-        self.lang: str = lang
+
+class OA_Source:
+    def __init__(self, uid: str, id: str, url: str, prefetch_url: str, audio_lang: str, sub_lang: str, source: str, quality: str, subber: str) -> None:
+        self.uid: str = uid
+        self.id: str = id
+        self.url: str = url
+        self.prefetch_url: str = prefetch_url
+        self.audio_lang: str = audio_lang
+        self.sub_lang: str = sub_lang
+        self.source: str = source
+        self.quality: str = quality
+        self.subber: str = subber
 
     def info(self, type: Literal['printable'] | Literal['JSON'] = "JSON") -> dict:
         if type.lower() == "json":
             return {
+                "uid": self.uid,
+                "id": self.id,
+                "url": self.url,
+                "prefetch_url": self.prefetch_url,
+                "audio_lang": self.audio_lang,
+                "sub_lang": self.sub_lang,
+                "source": self.source,
+                "quality": self.quality,
+                "subber": self.subber
+            }
+        
+        return f"UID: {self.uid}\n" +\
+            f"ID: {self.id}\n" +\
+            f"URL: {self.url}\n" +\
+            f"Prefetch URL: {self.prefetch_url}\n" +\
+            f"Audio Language: {self.audio_lang}\n" +\
+            f"Sub Language: {self.sub_lang}\n" +\
+            f"Source: {self.source}\n" +\
+            f"Quality: {self.quality}\n" +\
+            f"Subber: {self.subber}"
+
+class OA_Episode(Episode):
+    def __init__(self, url: str, uid: str, id: str, index: int, series: OA_Series, title: str, lang: str,
+        duration: str = None, sources: List[OA_Source] = None, qualities: List[str] = None, *args, requester: Requester, **kwargs) -> None:
+        super().__init__(url, uid, series, title, None, None, duration, None, *args, requester=requester, **kwargs)
+
+        self.index: int = index
+        self.id: str = id
+        self.series: OA_Series = series
+        self.lang: str = lang
+        self.sources: List[OA_Source] = [source if isinstance(source, OA_Source) else OA_Source(**source) for source in sources or []]
+        self.qualities: List[str] = qualities or deduplicate([source.quality for source in self.sources])
+
+    async def get_sources(self, force_scrape: bool = False, update_db: bool = True, min_quality: int = 1080) -> List[dict]:
+        if not force_scrape and self.sources:
+            return self.sources
+
+        data = "id=" + self.id
+        player_list = json.loads(json.loads((await self.requester.post(self.series.service.player_list_url, headers={
+            "Referer": self.series.url,
+            "Content-Length": str(len(data.encode())),
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+        }, data=data))['text'])['data'])
+
+        players: List[OA_Source] = []
+        tasks: List[Task] = []
+
+        for player in player_list['players']:
+            async def request_data(player, source: OA_Source):
+                data = f"id={player['id']}"
+                player_data = json.loads((await self.requester.post(self.series.service.player_data_url, headers={
+                    "Referer": self.series.url,
+                    "Content-Length": str(len(data.encode())),
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+                }, data=data))['text'])
+
+                if player['url'] == "cda":
+                    cda_data = await CDA.source_extractor(player_data['data'], prefer_quality=player['quality'])
+                    quality = source.quality if source.quality in list(cda_data.keys()) else str(max([int(key.removeSuffix("p")) for key in cda_data if key not in ["qualities", "duration"]])) + "p"
+                    players[players.index(source)].url = cda_data[quality]
+                    for quality in cda_data['qualities']:
+                        if not quality in self.qualities:
+                            self.qualities.append(quality)
+ 
+                players[players.index(source)].prefetch_url = player_data['data']
+
+                tasks.remove(asyncio.current_task())
+
+            source = OA_Source(
+                uid=f"oa-{player['id']}",
+                id=player['id'],
+                url=None,
+                prefetch_url=None,
+                audio_lang=player['audio'],
+                sub_lang=player['sub'],
+                source=player['url'],
+                quality=player['quality'] or "unknown",
+                subber=player['sub_group'] or "unknown"
+            )
+            if any([normalize(sanitize(player.get('quality', 'unknown') or "unknown")) == normalize(sanitize(other_player.quality)) \
+             and normalize(sanitize((player.get('sub_group', 'unknown') or "unknown").replace(" ", ""))) == normalize(sanitize(other_player.subber.replace(" ", ""))) for other_player in players]) \
+             or (min_quality and int(player.get('quality', '-1p').replace('p', '') or 0) < min_quality):
+                players.append(source)
+                continue
+            
+            players.append(source)
+
+            tasks.append(asyncio.create_task(request_data(player, source)))
+
+        if tasks:
+            await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+
+        self.sources = players
+        self.qualities = deduplicate([source.quality for source in self.sources])
+
+        if update_db:
+            for source in self.sources:
+                if not source.url:
+                    continue
+
+                self.sources[self.sources.index(source)].url = self.series.service.store_media(source.url, self, "episode", media_id=f"{source.id}", lookup_meta={
+                    "subber": source.subber,
+                    "quality": source.quality,
+                    "audio_lang": source.audio_lang,
+                    "sub_lang": source.sub_lang,
+                    "source": source.source,
+                })
+
+            in_db = bool(self.series.service._database.select("content", ["uid"], "uid = ?", [self.uid]))
+            content_info = self.info("JSON")
+            (self.series.service._database.update if in_db else
+            self.series.service._database.insert)("content", [
+                "uid",
+                "origin_url",
+                "searchable",
+                "source",
+                "weight",
+                "type",
+                "title",
+                "meta"
+            ], [
+                self.uid,
+                self.url,
+                True,
+                "ogladajanime",
+                .6,
+                "episode",
+                self.title,
+                json.dumps({key:content_info[key] for key in content_info if key not in ["uid", "title", "url"]})
+            ], **({
+                "where": "uid = ?",
+                "where_values": [self.uid]
+            } if in_db else {}))
+
+        return players
+    
+    async def download(self, source_id: str) -> AsyncGenerator[bytes, None]:
+        pass
+
+    def info(self, type: Literal['printable'] | Literal['JSON'] = "JSON") -> dict:
+        if type.lower() == "json":
+            return {
+                #**super().info("JSON"),
+                "id": self.id,
                 "uid": self.uid,
                 "url": self.url,
                 "title": self.title,
                 "index": self.index,
                 "lang": self.lang,
                 "duration": self.duration,
-                "series": self.series.uid
+                "series": self.series.uid,
+                "sources": [source.info("JSON") for source in self.sources],
+                "qualities": self.qualities
             }
         
-        return f"UID: {self.uid}\n" +\
+        return super().info("printable") +\
+            f"ID: {self.id}\n" +\
+            f"UID: {self.uid}\n" +\
             f"URL: {self.url}\n" +\
             f"Title: {self.title}\n" +\
             f"Index: {self.index}\n" +\
             f"Language: {self.lang}\n" +\
             f"Duration (seconds): {self.duration}" +\
-            f"Series: {self.series.uid}"
+            f"Series: {self.series.uid}" +\
+            f"Players: {self.players}" +\
+            f"Qualities: {', '.join(self.qualities)}"
 
 class OgladajAnime_pl(Service):
     def __init__(self, *args, database: Database, search_suggestion_cache_size: int = (1024 * 1024 * 100), **kwargs) -> None:
@@ -509,6 +869,8 @@ class OgladajAnime_pl(Service):
         self.homepage_url: str = self.base_url
         self.search_suggestions_url: str = self.base_url + "/manager.php?action=get_anime_names"
         self.anime_url: str = self.base_url + "/manager.php?action=anime"
+        self.player_list_url: str = self.base_url + "/manager.php?action=get_player_list"
+        self.player_data_url: str = self.base_url + "/manager.php?action=change_player_url"
 
         self.logo_url: str = "/media/ogladajanime-logo-full.png"
         self.icon_url: str = "/media/ogladajanime-icon.png"
@@ -525,16 +887,30 @@ class OgladajAnime_pl(Service):
             "X-Requested-With": "XMLHttpRequest",
         }
 
-    def store_media(self, url: str, owner: Union[OA_Episode, OA_Movie, OA_Series], media_name: Union[Literal["thumbnail"]]):
-        if media_name != "thumbnail":
-            return
-        
+    def store_media(self, url: str, owner: Union[OA_Episode, OA_Movie, OA_Series], media_name: Union[Literal["thumbnail"]], *, media_id: str = None, lookup_meta: Union[str, dict] = None):
         existing = self._database.select("media", ["id", "origin_url", "refers_to"], "origin_url = ? AND refer_id != ?", [url, owner.uid])
         existing_exact = self._database.select("media", ["id", "origin_url", "refers_to"], "origin_url = ? AND refer_id = ?", [url, owner.uid])
         if media_name == "thumbnail":
             format = url.split("?")[0].split(".")[-1]
             media_id = f"{int(url.split('?')[0].split('/')[-1].split('.')[0].replace('w', ''))}w"
             media_type = "image"
+
+        if media_name == "episode":
+            format = url.split("?")[0].split(".")[-1]
+            media_type = "video"
+
+
+
+        if not lookup_meta:
+            lookup_meta = {}
+
+        if isinstance(lookup_meta, dict):
+            lookup_meta = json.dumps(lookup_meta)
+
+
+
+        if any([not x for x in [format, media_id, media_type]]):
+            raise ValueError("Missing media metadata!")
 
         if existing:
             refers_to = existing[0][2] or existing[0][0]
@@ -544,6 +920,7 @@ class OgladajAnime_pl(Service):
                     "media_format",
                     "media_name",
                     "media_id",
+                    "lookup_meta",
                     "origin_url",
                     "data",
                     "refers_to"
@@ -553,11 +930,13 @@ class OgladajAnime_pl(Service):
                     format,
                     media_name,
                     media_id,
+                    lookup_meta,
                     None,
                     None,
                     refers_to
                 ]
             )
+            
         elif not existing_exact:
             self._database.insert("media", [
                     "refer_id",
@@ -565,6 +944,7 @@ class OgladajAnime_pl(Service):
                     "media_format",
                     "media_name",
                     "media_id",
+                    "lookup_meta",
                     "origin_url",
                     "data",
                     "refers_to"
@@ -574,15 +954,16 @@ class OgladajAnime_pl(Service):
                     format,
                     media_name,
                     media_id,
+                    lookup_meta,
                     url,
                     None,
                     None
                 ]
             )
 
-        return f"/cdn/media/{owner.uid}/thumbnail?format={format}&id={media_id}"
+        return f"/cdn/media/{owner.uid}/{media_name}?format={format}&id={media_id}"
 
-    def get_by_uid(self, uid: str, get_similar: bool = False, get_episodes: bool = False, series: OA_Series = None) -> Union[OA_Movie, OA_Series, OA_Episode]:
+    def get_by_uid(self, uid: str, get_similar: bool = False, get_episodes: bool = False) -> Union[OA_Movie, OA_Series, OA_Episode]:
         if not uid.startswith("oa-"):
             raise ValueError("Invalid UID")
 
@@ -602,17 +983,16 @@ class OgladajAnime_pl(Service):
             )
 
         if content[1] == "episode":
-            if not series:
-                raise ValueError("Series not provided for episode!")
+            episode_data = json.loads(content[3])
 
             return OA_Episode(
                 url=content[0],
                 uid=uid,
                 service=self,
-                series=series,
+                series=self.get_by_uid(episode_data.pop("series"), False, False),
                 title=content[2],
                 requester=self.requester,
-                **{key: value for key, value in json.loads(content[3]).items() if key not in ["series"]}
+                **episode_data
             )
         
         series_data: dict = json.loads(content[3])
@@ -624,7 +1004,7 @@ class OgladajAnime_pl(Service):
             requester=self.requester,
             **{key: series_data[key] for key in series_data if key not in ["service"]}
         )
-        series.episodes = [self.get_by_uid(episode, False, False, series) for episode in series_data["episodes"]] if get_episodes else []
+        series.episodes = [self.get_by_uid(episode, False, False) for episode in series_data["episodes"]] if get_episodes else []
         series.similar = [self.get_by_uid(similar, False, True) for similar in series_data["similar"]] if get_similar else []
         
         return series

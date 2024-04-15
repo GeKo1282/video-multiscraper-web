@@ -5,10 +5,10 @@ from scripts.helper.socket import WebSocketServer, SocketSession
 from scripts.helper.cipher import RSACipher
 from scripts.helper.database import Database
 from scripts.helper.util import generate_id, sha512
-from scripts.scrappers import OgladajAnime_pl, OA_Movie, OA_Series, Service
+from scripts.scrappers import OgladajAnime_pl, OA_Movie, OA_Series, Service, Movie, Series, Episode
 from websockets import WebSocketClientProtocol
 from datetime import datetime
-from typing import List, Tuple, Optional
+from typing import List, Union, Optional
 
 def authorize_user(id: str, token: str, database: Database) -> bool:
     return bool(database.select("users", ["id"], "id = ? AND token = ?", [id, token]))
@@ -279,3 +279,45 @@ async def get_service_info(session: SocketSession, websocket: WebSocketClientPro
         "data": service.info(),
         "success": True
     }, session, unencrypted=True)
+
+async def get_player_info(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, services: List[Service], database: Database):
+    uid = data['data'].get('content_uid')
+    user_id = data['data'].get('user_id', "")
+    token = data['data'].get('token', "")
+
+    if not uid or not user_id or not token:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+
+    if not authorize_user(user_id, token, database):
+        await send_error(websocket, session, "Invalid credentials.", code=111, action=data.get('action'), additional={
+            "success": False
+        })
+        return
+    
+    content = database.select("content", ["source"], "uid = ?", [uid])
+
+    if not content:
+        await send_error(websocket, session, "Content not found.", action=data.get('action'))
+        return
+    
+    service = next((service for service in services if content[0][0] in service.codenames), None)
+
+    content = service.get_by_uid(uid, False, False)
+
+    if isinstance(content, Series):
+        if not content.is_scrapped:
+            await content.scrape()
+
+        episode: Episode = content.episodes[0]
+    else:
+        episode: Union[Episode, Movie] = content
+
+    if not episode.is_scrapped:
+        await episode.get_sources(force_scrape=True)
+
+    return await WebSocketServer.send(websocket, {
+        "action": "send-player-info",
+        "data": episode.info("JSON"),
+        "success": True
+    }, session)

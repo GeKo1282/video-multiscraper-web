@@ -64,9 +64,9 @@ class Requester:
                 self._requests_minute = 0
 
     def _should_hold(self):
-        return self._current_requests >= self.max_concurrent_requests or \
-             self._requests_minute >= self.max_requests_per_minute or \
-             self._requests_second >= self.max_requests_per_second
+        return (self._current_requests >= self.max_concurrent_requests and self.max_concurrent_requests != -1) or \
+             (self._requests_minute >= self.max_requests_per_minute and self.max_requests_per_minute != -1) or \
+             (self._requests_second >= self.max_requests_per_second and self.max_requests_per_second != -1)
 
     async def _request(self, method: str, url: str, *, headers: dict = None, timeout: int = 10, retries: int = None,
         retry_delay: int = None, backoff_exponent: int = None, proxies: dict = None, data: dict = None, allow_redirects: bool = True, **kwargs) -> aiohttp.ClientResponse:

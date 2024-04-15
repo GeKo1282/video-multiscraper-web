@@ -113,6 +113,7 @@ input {
 }
 
 .button {
+    user-select: none;
     cursor: pointer;
     transition: var(--transition-time-short) ease;
 }

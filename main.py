@@ -65,8 +65,13 @@ class ProgramController:
         self.webserver.add_path("/", ["POST"], APIExtender(socket_host=host, socket_port=self.settings['socketserver']['port'], public_rsa_key=self.rsa.public_key()))
         self.webserver.extend(WebExtender(database=self.database))
 
+        if not Path("data/oa-headers.json").exists():
+            print(Fore.RED + "Missing headers for OglądajAnime.pl. Please provide them in data/oa-headers.json." + Color.RESET)
+
         Requester("oa-requester",
             default_headers={
+                "Host": "ogladajanime.pl",
+                "Origin": "https://ogladajanime.pl",
                 "Referer": "https://ogladajanime.pl",
                 "X-Requested-With": "XMLHttpRequest",
                 **(json.loads(open("data/oa-headers.json").read()) if Path("data/oa-headers.json").exists() else {})
@@ -74,6 +79,9 @@ class ProgramController:
             max_requests_per_minute=20, max_requests_per_second=20,
             default_user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
         )
+
+        Requester("cda.main",
+         default_user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
 
         self.database.create_table("users", [
             "id TEXT PRIMARY KEY UNIQUE NOT NULL",
@@ -110,16 +118,28 @@ class ProgramController:
         self.database.create_table("media", [
             "id INTEGER PRIMARY KEY AUTOINCREMENT",
             "refer_id TEXT REFERENCES content(uid) NOT NULL",
+            "requires_token BOOLEAN NOT NULL DEFAULT TRUE",
             
             "media_type TEXT NOT NULL", #eg. video, image, audio
             "media_format TEXT NOT NULL",
             "media_name TEXT NOT NULL", #eg. thumbnail, video, opening, etc. Used for geting through url.
             "media_id INT NOT NULL", #for when there is more than one media of the same type for the same content, eg. multiple resolutions or thumbnails.
-            # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}]: /media/1234/thumbnail, /media/1234/opening?format=mp4, /media/1234/video?format=mp4&id=1080p, /media/1234/thumbnail?id=1
+            "lookup_meta TEXT NOT NULL DEFAULT '{}'", #used for searching for the media, eg. resolution, quality, etc.
+            # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}][&meta_arg=meta_val]: /media/1234/thumbnail, /media/1234/opening?format=mp4, /media/1234/video?format=mp4&id=1080p, /media/1234/thumbnail?id=1
             
             "origin_url TEXT UNIQUE DEFAULT NULL",
             "data BLOB DEFAULT NULL",
             "refers_to TEXT REFERENCES media(id) DEFAULT NULL",
+        ])
+
+        self.database.create_table("small_tokens", [
+            "id INTEGER PRIMARY KEY AUTOINCREMENT",
+
+            "user_id TEXT REFERENCES users(id) NOT NULL",
+            "media_id TEXT REFERENCES media(id) NOT NULL",
+            "token TEXT NOT NULL",
+            "created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            "expires DATETIME NOT NULL"
         ])
 
         self.oa = OgladajAnime_pl(database=self.database, requester=Requester.get_requester("oa-requester"))
@@ -262,60 +282,64 @@ class ProgramController:
             except (websockets.exceptions.ConnectionClosedError, websockets.exceptions.ConnectionClosedOK):
                 break
             except CouldNotLoadData:
-                await send_error(websocket, session, "Could not read data.")
+                asyncio.create_task(send_error(websocket, session, "Could not read data."))
                 continue
 
             if data.get('action') == 'get-rsa-key':
-                await get_rsa_key(session, websocket, self.rsa)
+                asyncio.create_task(get_rsa_key(session, websocket, self.rsa))
                 continue
 
             if not data.get('data'):
-                await send_error(websocket, session, "Invalid data.")
+                asyncio.create_task(send_error(websocket, session, "Invalid data."))
                 print(f"Received invalid data: {data}")
                 continue
 
             if data.get('action') == 'send-rsa-key':
-                await send_rsa_key(session, websocket, data)
+                asyncio.create_task(send_rsa_key(session, websocket, data))
                 continue
 
             if data.get('action') == 'send-aes-key':
-                await send_aes_key(session, websocket, data)
+                asyncio.create_task(send_aes_key(session, websocket, data))
                 continue
 
             if data.get('action') == 'get-salt':
-                await get_salt(session, websocket, data, self.database)
+                asyncio.create_task(get_salt(session, websocket, data, self.database))
                 continue
 
             if data.get('action') == 'get-user-auth':
-                await get_user_auth(session, websocket, data, self.database)
+                asyncio.create_task(get_user_auth(session, websocket, data, self.database))
                 continue
 
             if data.get('action') == 'login':
-                await login(session, websocket, data, self.database)
+                asyncio.create_task(login(session, websocket, data, self.database))
                 continue
                 
             if data.get('action') == 'register':
-                await register(session, websocket, data, self.database)
+                asyncio.create_task(register(session, websocket, data, self.database))
                 continue
 
             if data.get('action') == 'get-user-info':
-                await get_user_info(session, websocket, data, self.database)
+                asyncio.create_task(get_user_info(session, websocket, data, self.database))
                 continue
 
             if data.get('action') == 'get-search-suggestions':
-                await get_search_suggestions(session, websocket, data, self.oa)
+                asyncio.create_task(get_search_suggestions(session, websocket, data, self.oa))
                 continue
 
             if data.get('action') == 'search':
-                await search(session, websocket, data, self.oa, self.database)
+                asyncio.create_task(search(session, websocket, data, self.oa, self.database))
                 continue
 
             if data.get('action') == 'get-content-info':
-                await get_content_info(session, websocket, data, self.oa, self.database)
+                asyncio.create_task(get_content_info(session, websocket, data, self.oa, self.database))
                 continue
 
             if data.get('action') == 'get-service-info':
-                await get_service_info(session, websocket, data, [self.oa])
+                asyncio.create_task(get_service_info(session, websocket, data, [self.oa]))
+                continue
+
+            if data.get('action') == 'get-player-info':
+                asyncio.create_task(get_player_info(session, websocket, data, [self.oa], self.database))
                 continue
             
             print(f"Received: {data}")

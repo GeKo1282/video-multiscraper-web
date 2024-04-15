@@ -41,3 +41,6 @@ def sanitize(string: str) -> str:
 
 def normalize(string: str):
     return string.replace(" ", "-").lower()
+
+def deduplicate(data: List[str]) -> List[str]:
+    return list(set(data))

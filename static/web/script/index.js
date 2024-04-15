@@ -80,8 +80,10 @@ function make_sliders() {
     }
 }
 
-function switch_page(page_id) {
+function switch_page(page_id, change_url = true, clear_favicon = true) {
     if (!page_id.endsWith('-page')) page_id += '-page';
+
+    let target = document.getElementById(page_id);
 
     let pages = [...Array.from(document.getElementById("app-layer").getElementsByClassName('page shown')),
     ...Array.from(document.getElementById("floating-layer").getElementsByClassName('page shown'))];
@@ -90,7 +92,10 @@ function switch_page(page_id) {
         element.classList.remove('shown');
     });
 
-    document.getElementById(page_id).classList.add('shown');
+    target.classList.add('shown');
+
+    if (change_url) window.history.pushState({id: "100"}, target.id, target.dataset.path ? target.dataset.path : '/' + target.id.replace('-page', ''));
+    if (clear_favicon) changeFavicon('/media/favicon.ico');
 }
 
 async function get_user_info() {
@@ -192,8 +197,9 @@ async function search() {
         if (decrypted.action != 'send-search-results') {global.websocket.pass_onmessage(self, decrypted, _); return;}
         
         update_search_results(decrypted.data);
-        switch_page('search-results');
+        switch_page('search-results', false);
         global.websocket.remove_onmessage(self);
+        document.title = `Search: ${value}`;
         window.history.pushState({id: "100"}, `Search: ${value}`, `/search?query=${btoa(value)}`);
     });
     
@@ -439,40 +445,80 @@ async function open_content_page(content_uid) {
         elements.trailer.appendChild(video);
     }
 
+    elements.episodes.innerHTML = '';
     for (let episode of content_data.episodes) {
         let episode_element = document.createElement('div');
 
         let details = document.createElement('div');
+
+        let more_controls_menu = document.createElement('div');
+
+        let play_button = document.createElement('div');
+        let download_button = document.createElement('div');
+        let more_button = document.createElement('div');
         
+        let controls = document.createElement('div');
+
         let index = document.createElement('div');
         let title = document.createElement('div');
+        let details_right = document.createElement('div');
         let origin_url = document.createElement('div');
         let language = document.createElement('div');
 
-        episode_element.classList.add('episode');
-        
-        details.classList.add('details');
+        more_controls_menu.classList.add('more-controls-menu');
 
+        play_button.classList.add('play-button', 'button');
+        download_button.classList.add('download-button', 'button');
+        more_button.classList.add('more-button', 'button');
+        
         index.classList.add('index');
         title.classList.add('title');
         origin_url.classList.add('origin-url');
+
+        details_right.classList.add('details-right');
+
+        controls.classList.add('controls');
+        details.classList.add('details');
         language.classList.add('language');
 
-        index.innerText = episode.index;
+        episode_element.classList.add('episode');
+
+        play_button.setAttribute('data-icon', 'play');
+        download_button.setAttribute('data-icon', 'download');
+        more_button.setAttribute('data-icon', 'more');
+
+        play_button = make_icon(play_button);
+        download_button = make_icon(download_button);
+        more_button = make_icon(more_button);
+
+        play_button.setAttribute('onclick', `open_player('${episode.uid}')`);
+
+        index.innerText = episode.index + ".";
         title.innerText = shorten_string(episode.title, 30);
         origin_url.innerText = episode.url;
+        
         language.innerText = (episode.lang.toLowerCase() == "unknown" ? "unk" : episode.lang).toUpperCase();
 
-        details.appendChild(title);
-        details.appendChild(origin_url);
+        controls.appendChild(more_controls_menu);
 
-        episode_element.appendChild(index);
+        controls.appendChild(play_button);
+        controls.appendChild(download_button);
+        controls.appendChild(more_button);
+
+        details_right.appendChild(title);
+        details_right.appendChild(origin_url);
+
+        details.appendChild(index);
+        details.appendChild(details_right);
+
+        episode_element.appendChild(controls);
         episode_element.appendChild(details);
         episode_element.appendChild(language);
         
         elements.episodes.appendChild(episode_element);
     }
 
+    elements.similar.innerHTML = '';
     for (let similar of content_data.similar) {
         let similar_element = document.createElement('div');
 
@@ -492,7 +538,9 @@ async function open_content_page(content_uid) {
         elements.similar.appendChild(similar_element);
     }
 
-    switch_page('content-page');
+    switch_page('content-page', false);
+    changeFavicon(service_data.icon_url);
+    document.title = content_data.title;
     window.history.pushState({id: "100"}, `Content: ${content_data.title}`, `/content?uid=${btoa(content_uid)}`);
 }
 
@@ -556,4 +604,29 @@ function content_switch_lower(switch_to) {
     new_section.classList.add('shown');
 
     document.getElementById('content-page').scrollTop = lower.getElementsByClassName('containers')[0].offsetTop - document.getElementById('pages-box').clientHeight + Math.min(new_section.clientHeight, 500);
+}
+
+async function open_player(episode_or_series_uid, optional_episode_index = -1) {
+    let player_data = await new Promise((resolve, reject) => {
+        global.websocket.add_onmessage((decrypted, _, self) => {
+            if (decrypted.action != 'send-player-info') {
+                global.websocket.pass_onmessage(self, decrypted, _);
+                return;
+            }
+
+            global.websocket.remove_onmessage(self);
+            resolve(decrypted.data);
+        });
+
+        global.websocket.send(JSON.stringify({
+            action: 'get-player-info',
+            data: {
+                content_uid: episode_or_series_uid,
+                user_id: global.user.info.id,
+                token: global.user.info.token
+            }
+        }));
+    });
+
+    console.log(player_data);
 }

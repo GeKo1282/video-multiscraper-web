@@ -9,6 +9,7 @@
 }
 
 #content-page > .title {
+    text-align: center;
     color: rgb(var(--font-color));
     font-size: 64px;
 }
@@ -59,7 +60,7 @@
 #content-page > .content .controls > .button {
     display: flex;
     align-items: center;
-    justify-content: start;
+    justify-content: center;
     gap: 10px;
     height: 100%;
     color: rgb(var(--font-color));
@@ -129,7 +130,7 @@
     gap: 50px;
 }
 
-#content-page .lower .controls {
+#content-page .lower > .controls {
     width: 100%;
     display: flex;
     align-items: center;
@@ -139,7 +140,7 @@
     border: 2px solid rgb(var(--tetriary-color));
 }
 
-#content-page .lower .controls::before {
+#content-page .lower > .controls::before {
     content: "";
     position: absolute;
     width: 25%;
@@ -152,7 +153,7 @@
     transform: translateX(calc(100% * var(--slider-position) - 100%));
 }
 
-#content-page .lower .controls > .choice {
+#content-page .lower > .controls > .choice {
     flex: 1 1 1px;
     display: flex;
     align-items: center;
@@ -204,15 +205,70 @@ body.animate #content-page .lower > .containers > div {
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    padding: 10px 30px;
+    padding: 10px;
     border: 2px solid rgb(var(--primary-color));
     color: rgb(var(--font-color));
     border-radius: 5px;
+    gap: 20px;
 }
 
-#content-page .lower .episode > .index,
+#content-page .lower .episode .controls {
+    height: 50px;
+    width: 190px;
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    gap: 20px;
+}
+
+#content-page .lower .episode .controls .more-controls-menu {
+    position: absolute;
+}
+
+#content-page .lower .episode .controls > .button {
+    height: 100%;
+    aspect-ratio: 1;
+    fill: currentColor;
+}
+
+#content-page .lower .episode .controls > .download-button {
+    transform: scale(.85); /* For some reason, this specific button is a bit larger than the others */
+}
+
+body.animate #content-page .lower .episode .controls > .button {
+    transition: var(--transition-time) ease;
+}
+
+#content-page .lower .episode .controls > .button:hover {
+    color: rgb(var(--font-color-dark));
+}
+
+#content-page .lower .episode .details {
+    margin-left: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    gap: 10px;
+    flex: 1 1 1px;
+}
+
+#content-page .lower .episode .details-right {
+    flex: 1 1 1px;
+    display: flex;
+    align-items: start;
+    justify-content: start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 5px;
+}
+
+#content-page .lower .episode .index,
 #content-page .lower .episode > .language {
     font-size: 48px;
+    color: rgb(var(--font-color-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 #content-page .lower .episode .title {
