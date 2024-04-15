@@ -109,16 +109,17 @@ class ProgramController:
 
         self.database.create_table("media", [
             "id INTEGER PRIMARY KEY AUTOINCREMENT",
-            "refer_id TEXT REFERENCES content(uid)",
+            "refer_id TEXT REFERENCES content(uid) NOT NULL",
             
             "media_type TEXT NOT NULL", #eg. video, image, audio
             "media_format TEXT NOT NULL",
-            "media_name TEXT NOT NULL", #eg. thumbnail, 1080p, opening, etc. Used for geting through url.
+            "media_name TEXT NOT NULL", #eg. thumbnail, video, opening, etc. Used for geting through url.
             "media_id INT NOT NULL", #for when there is more than one media of the same type for the same content, eg. multiple resolutions or thumbnails.
-            # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}]: /media/1234/thumbnail, /media/1234/opening.mp4, /media/1234/1080p.mp4, /media/1234/thumbnail.jpg/2
+            # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}]: /media/1234/thumbnail, /media/1234/opening?format=mp4, /media/1234/video?format=mp4&id=1080p, /media/1234/thumbnail?id=1
             
             "origin_url TEXT UNIQUE DEFAULT NULL",
-            "file BLOB DEFAULT NULL",
+            "data BLOB DEFAULT NULL",
+            "refers_to TEXT REFERENCES media(id) DEFAULT NULL",
         ])
 
         self.oa = OgladajAnime_pl(database=self.database, requester=Requester.get_requester("oa-requester"))

@@ -459,9 +459,9 @@ async function open_content_page(content_uid) {
         language.classList.add('language');
 
         index.innerText = episode.index;
-        title.innerText = episode.title;
+        title.innerText = shorten_string(episode.title, 30);
         origin_url.innerText = episode.url;
-        language.innerText = episode.lang.toUpperCase();
+        language.innerText = (episode.lang.toLowerCase() == "unknown" ? "unk" : episode.lang).toUpperCase();
 
         details.appendChild(title);
         details.appendChild(origin_url);

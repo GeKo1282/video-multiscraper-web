@@ -1,4 +1,4 @@
-from flask import Flask, Response, jsonify, send_from_directory
+from flask import Flask, Response, request, send_from_directory, redirect
 from scripts.helper.http import Extender
 from scripts.helper.database import Database
 from typing import List, Callable, Tuple
@@ -18,7 +18,8 @@ class WebExtender(Extender):
             ("/login", ["GET"], self.login),
             ("/", ["GET"], self.app),
             ("/<path:path>", ["GET"], self.app),
-            ("/cdn/user/<id>/avatar", ["GET"], self.avatar)
+            ("/cdn/user/<id>/avatar", ["GET"], self.avatar),
+            ("/cdn/media/<content_id>/<resource>", ["GET"], self.cdn_media),
         ]
 
     def script(self, path: str) -> Response:
@@ -54,3 +55,31 @@ class WebExtender(Extender):
             return "Invalid request", 400
         
         return Response(image_data[0][0], mimetype="image/png")
+    
+    def cdn_media(self, content_id: str, resource: str) -> Response:
+        format = request.args.get("format", None)
+        media_id = request.args.get("id", None)
+        content = self.database.select("media", ["media_type", "media_format", "media_id", "origin_url", "data", "refers_to"], f"refer_id = ? AND media_name = ? {'AND media_format = ? ' if format else ''}{'AND media_id = ? ' if media_id else ''}", [content_id, resource, *([format] if format else []), *([media_id] if media_id else [])])
+
+        if not content:
+            return "Invalid request", 400
+        
+        while content[0][5]:
+            new_content = self.database.select("media", ["media_type", "media_format", "media_id", "origin_url", "data", "refers_to"], f"id = ?", [content[0][5]])
+            
+            if not new_content:
+                return "Invalid request", 400
+            
+            content = (
+                content[0][0],
+                content[0][1],
+                content[0][2],
+                content[0][3],
+                new_content[0][4],
+                new_content[0][5]
+            )
+
+        if not content[0][4]:
+            return redirect(content[0][3])
+        
+        return Response(content[0][4], mimetype=f"{content[0][0]}/{content[0][1] if content[0][1] else 'plain'}")

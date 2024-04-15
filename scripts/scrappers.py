@@ -315,7 +315,9 @@ class OA_Series(Series):
         self.tags = [sanitize(element.text) for element in meta_container.find_all("div", recursive=False)[-1].find_all("div", class_="col-12", recursive=False)[1].find_all("div", class_="col-12")[1].find_all("span")[1:]]
         self.thumbnail = soup.find("img", attrs={"alt": self.title})["data-srcset"].split(" ")[0]
         self.rating = float(sanitize(soup.find("h4", class_="col-6").text.split("/")[0]))
-        
+
+        self.thumbnail = self.service.store_media(self.thumbnail, self, "thumbnail")
+
         similars: List[OA_Series, OA_Movie] = []
         tasks: List[Task] = []
         for similar in soup.find("div", id="similar_animes").find_all("div", class_="card-body"):
@@ -523,6 +525,63 @@ class OgladajAnime_pl(Service):
             "X-Requested-With": "XMLHttpRequest",
         }
 
+    def store_media(self, url: str, owner: Union[OA_Episode, OA_Movie, OA_Series], media_name: Union[Literal["thumbnail"]]):
+        if media_name != "thumbnail":
+            return
+        
+        existing = self._database.select("media", ["id", "origin_url", "refers_to"], "origin_url = ? AND refer_id != ?", [url, owner.uid])
+        existing_exact = self._database.select("media", ["id", "origin_url", "refers_to"], "origin_url = ? AND refer_id = ?", [url, owner.uid])
+        if media_name == "thumbnail":
+            format = url.split("?")[0].split(".")[-1]
+            media_id = f"{int(url.split('?')[0].split('/')[-1].split('.')[0].replace('w', ''))}w"
+            media_type = "image"
+
+        if existing:
+            refers_to = existing[0][2] or existing[0][0]
+            self._database.insert("media", [
+                    "refer_id",
+                    "media_type",
+                    "media_format",
+                    "media_name",
+                    "media_id",
+                    "origin_url",
+                    "data",
+                    "refers_to"
+                ], [
+                    owner.uid,
+                    media_type,
+                    format,
+                    media_name,
+                    media_id,
+                    None,
+                    None,
+                    refers_to
+                ]
+            )
+        elif not existing_exact:
+            self._database.insert("media", [
+                    "refer_id",
+                    "media_type",
+                    "media_format",
+                    "media_name",
+                    "media_id",
+                    "origin_url",
+                    "data",
+                    "refers_to"
+                ], [
+                    owner.uid,
+                    media_type,
+                    format,
+                    media_name,
+                    media_id,
+                    url,
+                    None,
+                    None
+                ]
+            )
+
+        return f"/cdn/media/{owner.uid}/thumbnail?format={format}&id={media_id}"
+
     def get_by_uid(self, uid: str, get_similar: bool = False, get_episodes: bool = False, series: OA_Series = None) -> Union[OA_Movie, OA_Series, OA_Episode]:
         if not uid.startswith("oa-"):
             raise ValueError("Invalid UID")
@@ -617,6 +676,8 @@ class OgladajAnime_pl(Service):
                     "series_type": sanitize(children.find("span", class_="badge").text)
                 } if normalize(sanitize(children.find("span", class_="badge").text)) != "movie" else {})
             )
+
+            content.thumbnail = self.store_media(sanitize(children.find("img")["data-srcset"].split(" ")[0]), content, "thumbnail")
 
             if not self._database.select("content", ["uid"], "uid = ?", [content.uid]):
                 content_info = content.info("JSON")

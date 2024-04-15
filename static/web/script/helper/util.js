@@ -329,6 +329,13 @@ function generate_string(length) {
     return result;
 }
 
+function shorten_string(string, limit) {
+    if (string.length > limit) {
+        return string.substring(0, limit - 3) + "...";
+    }
+    return string;
+}
+
 addLoadEvent(() => {
     place_icons();
 });
