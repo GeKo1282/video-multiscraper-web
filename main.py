@@ -123,7 +123,7 @@ class ProgramController:
             "media_type TEXT NOT NULL", #eg. video, image, audio
             "media_format TEXT NOT NULL",
             "media_name TEXT NOT NULL", #eg. thumbnail, video, opening, etc. Used for geting through url.
-            "media_id INT NOT NULL", #for when there is more than one media of the same type for the same content, eg. multiple resolutions or thumbnails.
+            "media_id TEXT NOT NULL", #for when there is more than one media of the same type for the same content, eg. multiple resolutions or thumbnails.
             "lookup_meta TEXT NOT NULL DEFAULT '{}'", #used for searching for the media, eg. resolution, quality, etc.
             # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}][&meta_arg=meta_val]: /media/1234/thumbnail, /media/1234/opening?format=mp4, /media/1234/video?format=mp4&id=1080p, /media/1234/thumbnail?id=1
             
