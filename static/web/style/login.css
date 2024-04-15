@@ -1,18 +1,49 @@
-:is(#app-layer, #floating-layer) > .content {
-    max-height: 85% !important;
+body.login-page, html:has(body.login-page) {
+    overflow-y: hidden !important;
 }
 
-#app-layer .content-background > .window {
+:is(#app-layer, #floating-layer) > .content {
+    height: 85%;
+    max-height: 85% !important;
+    width: 90%;
+    max-width: 90% !important;
+
+    position: relative;
+}
+
+#app-layer .content > .window {
     min-width: 600px;
     min-height: 300px;
-}
+    max-width: 100%;
+    max-height: 100%;
 
-#app-layer .content-background > .window {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
+    background: var(--window-background);
+    border-radius: 5px;
+    color: rgb(var(--font-color));
     padding: 35px 20px;
     margin-top: 0 !important;
+
+    overflow-y: auto;
+
+    border: 2px solid rgba(var(--tetriary-color), .4);
+    box-shadow: 0 0 6px 0 rgba(var(--tetriary-color-dark), .8);
 }
 
-#app-layer .content-background > .window > .header-block {
+body.animate #app-layer .content > .window {
+    transition: var(--transition-time) ease;
+}
+
+#app-layer .content > .window:not(.shown) {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#app-layer .content > .window > .header-block {
     width: 100%;
     display: flex;
     align-items: center;
@@ -23,11 +54,11 @@
     margin-bottom: 40px;
 }
 
-#app-layer .content-background > .window > .header-block > .top {
+#app-layer .content > .window > .header-block > .top {
     font-size: 64px;
 }
 
-#app-layer .content-background > .window > .section {
+#app-layer .content > .window > .section {
     width: 100%;
     display: flex;
     align-items: center;
@@ -36,11 +67,11 @@
     gap: 40px;
 }
 
-#app-layer .content-background > .window > .section.horizontal {
+#app-layer .content > .window > .section.horizontal {
     flex-direction: row;
 }
 
-#app-layer .content-background > .window .input-block {
+#app-layer .content > .window .input-block {
     width: 100%;
     display: flex;
     align-items: start;
@@ -49,11 +80,11 @@
     gap: 10px;
 }
 
-#app-layer .content-background > .window .input-block > .label {
+#app-layer .content > .window .input-block > .label {
     font-size: 24px;
 }
 
-#app-layer .content-background > .window .input-block > input {
+#app-layer .content > .window .input-block > input {
     width: 100%;
     font-size: 24px;
 
@@ -64,17 +95,17 @@
     transition: 500ms border ease, 1s box-shadow ease;
 }
 
-#app-layer .content-background > .window .input-block > input:not(.invalid):not(.valid) {
+#app-layer .content > .window .input-block > input:not(.invalid):not(.valid) {
     border: 3px solid rgba(var(--primary-color), .5);
     box-shadow: 0 0 10px rgba(var(--primary-color), .8);
 }
 
-#app-layer .content-background > .window .input-block > input:not(.invalid):not(.valid):focus {
+#app-layer .content > .window .input-block > input:not(.invalid):not(.valid):focus {
     border: 3px solid rgba(var(--primary-color), .6);
     box-shadow: 0 0 15px rgba(var(--primary-color), .9);
 }
 
-#app-layer .content-background > .window .buttons-panel {
+#app-layer .content > .window .buttons-panel {
     align-self: center;
     width: 100%;
     display: flex;
@@ -84,13 +115,12 @@
     margin-top: 60px;
 }
 
-#app-layer .content-background > .window .back-button-box {
+#app-layer .content > .window .back-button-box {
     height: 32px;
     font-size: 32px;
 
     display: flex;
     gap: 10px;
-    flex-direction: row-reverse;
     justify-content: start;
     align-items: center;
     margin-left: -10px;
