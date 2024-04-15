@@ -206,32 +206,43 @@ function make_validator_function(type, data) {
 }
 
 async function initialize_websocket_communications(regular_handler) {
-    let continue_setup = false;
+    await new Promise(async (resolve, reject) => {
+        if (global.rsa && global.rsa.private_key && global.rsa.public_key) { resolve(); }
 
-    if (!global.rsa) {
-        const worker = new Worker('./script/helper/worker.js');
+        let public_key = null;
+        let private_key = null;
+        let max_length = null;
 
-        worker.onmessage = (e) => {
-            if (e.data.message == 'rsa-keypair') {
-                global.rsa = new RSACipher(false);
-                global.rsa.import_public_key(e.data.data.public_key, e.data.data.max_length);
-                global.rsa.import_private_key(e.data.data.private_key);
-                continue_setup = true;
-            }
+        if (window.localStorage.getItem("rsa-public-key") && window.localStorage.getItem("max-rsa-length") && window.localStorage.getItem("rsa-private-key")) {
+            public_key = window.localStorage.getItem("rsa-public-key");
+            private_key = window.localStorage.getItem("rsa-private-key");
+            max_length = parseInt(window.localStorage.getItem("max-rsa-length"));
+        } else {
+            [public_key, max_length, private_key] = await new Promise((resolve, reject) => {
+                const worker = new Worker("./script/helper/worker.js");
+
+                worker.onmessage = (message) => {
+                    resolve([message.data.data.public_key, message.data.data.max_length, message.data.data.private_key]);
+                }
+
+                worker.postMessage({'action': 'generate-rsa-keypair'});
+            })
         }
 
-        worker.postMessage({'action': 'generate-rsa-keypair'});
-    } else {
-        continue_setup = true;
-    }
+        if (!global.rsa) global.rsa = new RSACipher(false);
+        global.rsa.import_public_key(public_key, max_length);
+        global.rsa.import_private_key(private_key);
+
+        resolve();
+
+        window.localStorage.setItem("rsa-public-key", public_key);
+        window.localStorage.setItem("max-rsa-length", max_length);
+        window.localStorage.setItem("rsa-private-key", private_key);
+    });
 
     if (!global.aes) {
         global.aes = new AESCipher();
         global.aes.generate_key(32);
-    }
-
-    while (!continue_setup) {
-        await sleep(50);
     }
 
     if (!global.websocket) {

@@ -21,12 +21,40 @@ addLoadEvent(async () => {
     global.user.info.id = localStorage.getItem('user_id');
     global.user.info.token = localStorage.getItem('token');
 
-    await initialize_websocket_communications(global.default_socket_hander);
-    await get_user_info();
-    update_user_info();
     assign_handlers();
     make_sliders();
+    await initialize_websocket_communications(global.default_socket_hander);
+    await get_user_info();
+    parse_urlargs();
 })
+
+function parse_urlargs() {
+    let url = new URL(window.location.href);
+    let path = url.pathname;
+    let args = url.searchParams;
+
+    let pathlist = {
+        "/search": (args) => {
+            let query = args.get('query');
+            if (!query) return;
+            
+            query = atob(query);
+
+            document.getElementById('search-bar').getElementsByClassName('search-input')[0].value = query;
+            search();
+        },
+        "/content": (args) => {
+            let uid = args.get('uid');
+            if (!uid) return;
+
+            uid = atob(uid);
+
+            open_content_page(uid);
+        }
+    }
+
+    if (pathlist[path]) pathlist[path](args);
+}
 
 function make_sliders() {
     let sliders = document.getElementsByClassName('custom-slider');
@@ -97,6 +125,7 @@ async function get_user_info() {
     }));
 
     await promise;
+    update_user_info();
 }
 
 function update_user_info() {
@@ -156,12 +185,16 @@ function assign_handlers() {
 async function search() {
     let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
 
+    let url = new URL(window.location.href);
+    if (url.pathname == "/search" && url.searchParams.get('query') == value) return;
+
     global.websocket.add_onmessage((decrypted, _, self) => {
         if (decrypted.action != 'send-search-results') {global.websocket.pass_onmessage(self, decrypted, _); return;}
         
         update_search_results(decrypted.data);
         switch_page('search-results');
         global.websocket.remove_onmessage(self);
+        window.history.pushState({id: "100"}, `Search: ${value}`, `/search?query=${btoa(value)}`);
     });
     
     await global.websocket.send(JSON.stringify({
@@ -354,6 +387,9 @@ async function open_content_page(content_uid) {
         similar: document.getElementById('content-page').getElementsByClassName('similar')[0]
     }
 
+    let url = new URL(window.location.href);
+    if (url.pathname == "/content" && url.searchParams.get('uid') == content_uid) return;
+
     let get_data = new Promise((resolve, reject) => {
         global.websocket.add_onmessage((decrypted, _, self) => {
             if (decrypted.action != 'send-content-info') {
@@ -457,6 +493,7 @@ async function open_content_page(content_uid) {
     }
 
     switch_page('content-page');
+    window.history.pushState({id: "100"}, `Content: ${content_data.title}`, `/content?uid=${btoa(content_uid)}`);
 }
 
 async function get_service_data(service_name) {

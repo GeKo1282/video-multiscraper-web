@@ -563,7 +563,7 @@ class OgladajAnime_pl(Service):
             service=self,
             title=content[2],
             requester=self.requester,
-            **series_data
+            **{key: series_data[key] for key in series_data if key not in ["service"]}
         )
         series.episodes = [self.get_by_uid(episode, False, False, series) for episode in series_data["episodes"]] if get_episodes else []
         series.similar = [self.get_by_uid(similar, False, True) for similar in series_data["similar"]] if get_similar else []
