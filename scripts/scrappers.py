@@ -1,4 +1,4 @@
-import asyncio, json, bs4, html,re
+import asyncio, json, bs4, html, re, pathlib
 from bs4 import BeautifulSoup
 from asyncio import Task
 from typing import Optional, List, Tuple, Union, Literal, AsyncGenerator, Dict, Coroutine
@@ -221,6 +221,11 @@ class Episode:
             This method is intended to be overwritten by devired classes.
         '''
 
+    async def get_media_metadata(self, media_id: str) -> dict:
+        '''
+            This method is intended to be overwritten by devired classes.
+        '''
+
     def info(self, type: Union[Literal['printable'], Literal['JSON']] = "JSON") -> dict:
         if type.lower() == "json":        
             return {
@@ -384,14 +389,14 @@ class CDA(SourceExtractor):
         def get_playerdata(soup: BeautifulSoup) -> dict:
             return json.loads(html.unescape(soup.find("div", id=re.compile(r"^mediaplayer.*$")).get("player_data")))['video']
         
-        def decrypt_file(a):            
+        def decrypt_file(a):    
             for p in ('_XDDD', '_CDA', '_ADC', '_CXD', '_QWE', '_Q5', '_IKSDE'):
                 a = a.replace(p, '')
             a = urlunquote(a)
             b = []
             for c in a:
                 f = c if type(c) is int else ord(c)
-                b.append(chr(33 + (f + 14) % 94) if 33 <= f and 126 >= f else chr(f))
+                b.append(chr(33 + (f + 14) % 94) if 33 <= f <= 126 else chr(f))
             a = ''.join(b)
             a = a.replace('.cda.mp4', '')
             for p in ('.2cda.pl', '.3cda.pl'):
@@ -458,7 +463,7 @@ class OA_Movie(Movie):
     async def scrape(self, *args) -> None:
         pass
 
-    def info(self, type: Union[Literal['printable'], Literal['JSON']] = "JSON") -> dict:
+    def info(self, type: Union[Literal['printable'], Literal['JSON']] = "JSON", *args, **kwargs) -> dict:
         if type.lower() == "json":
             return {
                 **super().info("JSON"),
@@ -564,7 +569,7 @@ class OA_Series(Series):
                 continue
 
             a, a2 = similar.find_all("a")
-            srating, spegi, stype = [element.text for element in similar.find_all("span")]
+            srating, spegi, stype = [element.text for element in similar.find_all("div", recursive=True)[-1].find_all("span")]
             similars.append((OA_Movie if stype == "movie" else OA_Series)(
                 uid = f"oa-{int(a2.find('div')['title'])}",
                 id = int(a2.find("div")["title"]),
@@ -724,7 +729,39 @@ class OA_Episode(Episode):
         self.sources: List[OA_Source] = [source if isinstance(source, OA_Source) else OA_Source(**source) for source in sources or []]
         self.qualities: List[str] = qualities or deduplicate([source.quality for source in self.sources])
 
-    async def get_sources(self, force_scrape: bool = False, update_db: bool = True, min_quality: int = 1080) -> List[dict]:
+    async def get_media_metadata(self, media_id: str, require_fields: List[str] = None) -> dict:
+        media = self.series.service._database.select("media", ["origin_url", "metadata"], "media_id = ?", [media_id])
+
+        if not media:
+            return
+        
+        if media[0][1] and all([key in media[0][1] for key in (require_fields or ["url", "audio_lang", "sub_lang", "source", "quality", "subber", "size", "duration"])]):
+            return json.loads(media[0][1])
+        
+        metadata = json.loads(media[0][1] or "{}")
+
+        if "size" not in metadata and "size" in require_fields:
+            metadata["size"] = int((await self.requester.head(media[0][0], headers={
+                "Referer": media[0][0],
+                "Cookie": "cda.player=html5",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+                "Range": "bytes=0-"
+            }))['headers']['Content-Length'])
+
+        self.series.service._database.update("media", ["metadata"], [json.dumps(metadata)], "media_id = ?", [media_id])
+        
+        return metadata
+
+    async def get_sources(self, scrape: bool = True, force_scrape: Union[bool, List[str], str] = False, scrape_one: bool = False, update_db: bool = True, min_quality: int = 1080) -> List[dict]:
+        if isinstance(force_scrape, str):
+            force_scrape = [force_scrape]
+        
+        if isinstance(force_scrape, list):
+            for index, source in enumerate(force_scrape):
+                if source.startswith("oa-"):
+                    force_scrape[index] = source.removeprefix("oa-")
+                
+        
         if not force_scrape and self.sources:
             return self.sources
 
@@ -770,34 +807,39 @@ class OA_Episode(Episode):
                 quality=player['quality'] or "unknown",
                 subber=player['sub_group'] or "unknown"
             )
-            if any([normalize(sanitize(player.get('quality', 'unknown') or "unknown")) == normalize(sanitize(other_player.quality)) \
+
+            if (player.get('quality') or "unknown") not in self.qualities:
+                self.qualities.append((player.get('quality') or "unknown"))
+
+            if (force_scrape and not isinstance(force_scrape, bool) and source.id not in force_scrape) or \
+             (any([normalize(sanitize(player.get('quality', 'unknown') or "unknown")) == normalize(sanitize(other_player.quality)) \
              and normalize(sanitize((player.get('sub_group', 'unknown') or "unknown").replace(" ", ""))) == normalize(sanitize(other_player.subber.replace(" ", ""))) for other_player in players]) \
-             or (min_quality and int(player.get('quality', '-1p').replace('p', '') or 0) < min_quality):
+             or (min_quality and int(player.get('quality', '-1p').replace('p', '') or 0) < min_quality)):
                 players.append(source)
                 continue
             
             players.append(source)
+            
+            if scrape:
+                tasks.append(asyncio.create_task(request_data(player, source)))
 
-            tasks.append(asyncio.create_task(request_data(player, source)))
+            if scrape_one:
+                break
 
         if tasks:
             await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
 
         self.sources = players
-        self.qualities = deduplicate([source.quality for source in self.sources])
 
         if update_db:
             for source in self.sources:
-                if not source.url:
-                    continue
-
-                self.sources[self.sources.index(source)].url = self.series.service.store_media(source.url, self, "episode", media_id=f"{source.id}", lookup_meta={
+                self.sources[self.sources.index(source)].url = self.series.service.store_media(source.url or "MISSING", self, "episode", media_id=f"{source.id}", lookup_meta={
                     "subber": source.subber,
                     "quality": source.quality,
                     "audio_lang": source.audio_lang,
                     "sub_lang": source.sub_lang,
                     "source": source.source,
-                })
+                }, uid=source.uid)
 
             in_db = bool(self.series.service._database.select("content", ["uid"], "uid = ?", [self.uid]))
             content_info = self.info("JSON")
@@ -827,10 +869,19 @@ class OA_Episode(Episode):
 
         return players
     
-    async def download(self, source_id: str) -> AsyncGenerator[bytes, None]:
-        pass
+    async def download(self, media_id: str, start: int, end: int, requester: Requester) -> bytes:
+        media = self.series.service._database.select("media", ["origin_url", "metadata"], "id = ?", [media_id])
 
-    def info(self, type: Literal['printable'] | Literal['JSON'] = "JSON") -> dict:
+        if not media:
+            raise ValueError("Media not found in database!")
+
+        return (await requester.get(media[0][0], headers={
+            "Referer": media[0][0],
+            "Range": f"bytes={start}-{end}",
+            "Cookie": "cda.player=html5",
+        }))['data']
+
+    def info(self, type: Literal['printable'] | Literal['JSON'] = "JSON", *args, **kwargs) -> dict:
         if type.lower() == "json":
             return {
                 #**super().info("JSON"),
@@ -887,9 +938,10 @@ class OgladajAnime_pl(Service):
             "X-Requested-With": "XMLHttpRequest",
         }
 
-    def store_media(self, url: str, owner: Union[OA_Episode, OA_Movie, OA_Series], media_name: Union[Literal["thumbnail"]], *, media_id: str = None, lookup_meta: Union[str, dict] = None):
+    def store_media(self, url: str, owner: Union[OA_Episode, OA_Movie, OA_Series], media_name: Union[Literal["thumbnail"]], *, media_id: str = None, lookup_meta: Union[str, dict] = None, download_priority: int = 0, uid: str = None):
         existing = self._database.select("media", ["id", "origin_url", "refers_to"], "origin_url = ? AND refer_id != ?", [url, owner.uid])
-        existing_exact = self._database.select("media", ["id", "origin_url", "refers_to"], "origin_url = ? AND refer_id = ?", [url, owner.uid])
+        existing_exact = self._database.select("media", ["id", "origin_url", "refers_to", "metadata"], "origin_url = ? AND refer_id = ?", [url, owner.uid]) or \
+        self._database.select("media", ["id", "origin_url", "refers_to", "metadata"], "uid = ?", [uid])
         if media_name == "thumbnail":
             format = url.split("?")[0].split(".")[-1]
             media_id = f"{int(url.split('?')[0].split('/')[-1].split('.')[0].replace('w', ''))}w"
@@ -915,22 +967,26 @@ class OgladajAnime_pl(Service):
         if existing:
             refers_to = existing[0][2] or existing[0][0]
             self._database.insert("media", [
+                    "uid",
                     "refer_id",
+                    "download_priority",
+                    "metadata",
                     "media_type",
                     "media_format",
                     "media_name",
                     "media_id",
-                    "lookup_meta",
                     "origin_url",
-                    "data",
+                    "data_path",
                     "refers_to"
                 ], [
+                    uid,
                     owner.uid,
+                    download_priority or 0,
+                    lookup_meta,
                     media_type,
                     format,
                     media_name,
                     media_id,
-                    lookup_meta,
                     None,
                     None,
                     refers_to
@@ -939,27 +995,59 @@ class OgladajAnime_pl(Service):
             
         elif not existing_exact:
             self._database.insert("media", [
+                    "uid",
                     "refer_id",
+                    "download_priority",
+                    "metadata",
                     "media_type",
                     "media_format",
                     "media_name",
                     "media_id",
-                    "lookup_meta",
                     "origin_url",
-                    "data",
+                    "data_path",
                     "refers_to"
                 ], [
+                    uid,
                     owner.uid,
+                    download_priority or 0,
+                    lookup_meta,
                     media_type,
                     format,
                     media_name,
                     media_id,
-                    lookup_meta,
                     url,
                     None,
                     None
                 ]
             )
+        else:
+            metadata = json.loads(existing_exact[0][3])
+            self._database.update("media",
+            [
+                "uid",
+                "refer_id",
+                "download_priority",
+                "metadata",
+                "media_type",
+                "media_format",
+                "media_name",
+                "media_id",
+                "origin_url",
+                "data_path",
+                "refers_to"
+            ], [
+                uid,
+                owner.uid,
+                download_priority or 0,
+                json.dumps({**metadata, **json.loads(lookup_meta)}),
+                media_type,
+                format,
+                media_name,
+                media_id,
+                url,
+                None,
+                None
+            ], "uid = ?", [uid])
 
         return f"/cdn/media/{owner.uid}/{media_name}?format={format}&id={media_id}"
 
@@ -973,14 +1061,18 @@ class OgladajAnime_pl(Service):
         
         content = content[0]
         if content[1] == "movie":
-            return OA_Movie(
+            movie_data: dict = json.loads(content[3])
+            movie = OA_Movie(
                 url=content[0],
                 uid=uid,
                 service=self,
                 title=content[2],
                 requester=self.requester,
-                **json.loads(content[3])
+                **{key: movie_data[key] for key in movie_data if key not in ["service"]}
             )
+        
+            movie.similar = [self.get_by_uid(similar, False, True) for similar in movie_data["similar"]] if get_similar else []
+            return movie
 
         if content[1] == "episode":
             episode_data = json.loads(content[3])
@@ -1057,7 +1149,7 @@ class OgladajAnime_pl(Service):
                 } if normalize(sanitize(children.find("span", class_="badge").text)) != "movie" else {})
             )
 
-            content.thumbnail = self.store_media(sanitize(children.find("img")["data-srcset"].split(" ")[0]), content, "thumbnail")
+            content.thumbnail = self.store_media(sanitize(children.find("img")["data-srcset"].split(" ")[0]), content, "thumbnail", download_priority=1)
 
             if not self._database.select("content", ["uid"], "uid = ?", [content.uid]):
                 content_info = content.info("JSON")

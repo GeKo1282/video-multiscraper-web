@@ -9,11 +9,13 @@
         <link rel="stylesheet" href="style/shared.css" />
         <link rel="stylesheet" href="style/index.css" />
         <link rel="stylesheet" href="style/index/content.css" />
+        <link rel="stylesheet" href="style/index/video-player.css" />
 
         <script src="script/helper/forge.min.js"></script>
         <script src="script/helper/aes.js"></script>
         <script src="script/helper/rsa.js"></script>
         <script src="script/helper/socket.js"></script>
+        <script src="script/helper/player.js"></script>
 
         <script src="script/helper/util.js"></script>
         <script src="script/helper/root.js"></script>
@@ -138,6 +140,16 @@
                 <div class="controls">
                     <div class="button" onclick="close_url_popup()">Cancel</div>
                     <div class="button" onclick="confirm_url_popup()">Continue</div>
+                </div>
+            </div>
+
+            <div id="video-player-window" class="window">
+                <div class="close-button" onclick="close_video_player()">
+                    <div class="icon" data-icon="x"></div>
+                </div>
+
+                <div class="video-player">
+                    <video id="video-player" controls></video>
                 </div>
             </div>
         </div>

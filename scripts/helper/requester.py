@@ -127,11 +127,18 @@ class Requester:
                     self._requests_minute += 1
                     self._current_backoff = 1
     
-                    return {
+                    to_return = {
                          "status": response.status,
                          "headers": response.headers,
-                         "text": await response.text()
+                         "data": await response.read()
                     }
+
+                    try:
+                         to_return["text"] = to_return["data"].decode("utf-8")
+                    except:
+                         pass
+                    
+                    return to_return
                 
     async def get(self, url: str, *, headers: dict = None, timeout: int = 10, retries: int = None, retry_delay: int = None,
         backoff_exponent: int = None, proxies: dict = None, params: dict = None, allow_redirects: bool = True, ssl: bool = True,

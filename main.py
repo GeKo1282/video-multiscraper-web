@@ -14,18 +14,20 @@ from scripts.helper.cipher import RSACipher, AESCipher
 from scripts.helper.util import generate_id, sha512
 from scripts.helper.database import Database
 from scripts.helper.requester import Requester
+from scripts.helper.downloader import Downloader
 
 class ProgramController:
     def __init__(self, prepare: bool = False):
         self.webserver: WebServer = WebServer()
         self.websocketserver: WebSocketServer = WebSocketServer()
+        self.downloader: Downloader = None
 
         self.rsa: RSACipher = None
 
         self.settings: dict = {}
         self.websocket_sessions: Dict[WebSocketClientProtocol, SocketSession] = {}
 
-        self.database: Database = Database("data/database.db")
+        self.database: Database = None
 
         self.default_settings = {
             "rsa": {
@@ -39,6 +41,15 @@ class ProgramController:
             "socketserver": {
                 "host": "0.0.0.0",
                 "port": 5001
+            },
+            "database": {
+                "path": "data/database.db"
+            },
+            "downloaders": {
+                "video": {
+                    "path_prefix": "[auto]",
+                    "limit_per_referer": 1,
+                }
             }
         }
 
@@ -49,6 +60,8 @@ class ProgramController:
 
     def prepare(self):
         self.settings = self.load_settings()
+
+        self.database = Database(self.settings['database']['path'])
         
         self.rsa = RSACipher()
         if self.settings['rsa']['keyfile'] and Path(self.settings['rsa']['keyfile']).exists():
@@ -60,15 +73,11 @@ class ProgramController:
             keypair = self.rsa.generate_keypair(self.settings['rsa']['keysize'])
             with open(self.settings['rsa']['keyfile'], "wb") as f:
                 f.write(base64.b64encode(json.dumps({"private": keypair[0], "public": keypair[1]}).encode()))
-        
-        host = self.settings['socketserver']['host'] if self.settings['socketserver']['host'] != self.settings['webserver']['host'] and not self.settings['socketserver']['host'] == "0.0.0.0" else ""
-        self.webserver.add_path("/", ["POST"], APIExtender(socket_host=host, socket_port=self.settings['socketserver']['port'], public_rsa_key=self.rsa.public_key()))
-        self.webserver.extend(WebExtender(database=self.database))
 
         if not Path("data/oa-headers.json").exists():
             print(Fore.RED + "Missing headers for OglądajAnime.pl. Please provide them in data/oa-headers.json." + Color.RESET)
 
-        Requester("oa-requester",
+        oa_requester = Requester("oa-requester",
             default_headers={
                 "Host": "ogladajanime.pl",
                 "Origin": "https://ogladajanime.pl",
@@ -117,19 +126,22 @@ class ProgramController:
 
         self.database.create_table("media", [
             "id INTEGER PRIMARY KEY AUTOINCREMENT",
+            "uid TEXT UNIQUE DEFAULT NULL",
             "refer_id TEXT REFERENCES content(uid) NOT NULL",
             "requires_token BOOLEAN NOT NULL DEFAULT TRUE",
+
+            "download_priority REAL NOT NULL DEFAULT 0", #Indicates the order in which the media should be downloaded, 0 meaining it won't be downloaded at all.
+            "metadata TEXT NOT NULL DEFAULT '{}'", #used for storing metadata about the media, eg. length, resolution, quality, etc.
             
             "media_type TEXT NOT NULL", #eg. video, image, audio
             "media_format TEXT NOT NULL",
             "media_name TEXT NOT NULL", #eg. thumbnail, video, opening, etc. Used for geting through url.
             "media_id TEXT NOT NULL", #for when there is more than one media of the same type for the same content, eg. multiple resolutions or thumbnails.
-            "lookup_meta TEXT NOT NULL DEFAULT '{}'", #used for searching for the media, eg. resolution, quality, etc.
             # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}][&meta_arg=meta_val]: /media/1234/thumbnail, /media/1234/opening?format=mp4, /media/1234/video?format=mp4&id=1080p, /media/1234/thumbnail?id=1
             
             "origin_url TEXT UNIQUE DEFAULT NULL",
-            "data BLOB DEFAULT NULL",
-            "refers_to TEXT REFERENCES media(id) DEFAULT NULL",
+            "data_path TEXT DEFAULT NULL",
+            "refers_to TEXT REFERENCES media(id) DEFAULT NULL"
         ])
 
         self.database.create_table("small_tokens", [
@@ -142,7 +154,38 @@ class ProgramController:
             "expires DATETIME NOT NULL"
         ])
 
+        self.database.create_table("temporary_media_data", [
+            "id INTEGER PRIMARY KEY AUTOINCREMENT",
+            "media_id TEXT REFERENCES media(id) NOT NULL",
+            "start_byte INTEGER NOT NULL",
+            "end_byte INTEGER NOT NULL",
+            "data BLOB NOT NULL",
+            "UNIQUE(media_id, start_byte, end_byte)"
+        ])
+
         self.oa = OgladajAnime_pl(database=self.database, requester=Requester.get_requester("oa-requester"))
+        self.downloader = Downloader(self.database, [self.oa], max_downloaders=20)
+
+        host = self.settings['socketserver']['host'] if self.settings['socketserver']['host'] != self.settings['webserver']['host'] and not self.settings['socketserver']['host'] == "0.0.0.0" else ""
+        self.webserver.add_path("/", ["POST"], APIExtender(socket_host=host, socket_port=self.settings['socketserver']['port'], public_rsa_key=self.rsa.public_key()))
+        self.webserver.extend(WebExtender(database=self.database, downloader=self.downloader))
+
+        try:
+            data = "id=207638"
+            player_list = json.loads(json.loads((asyncio.run(oa_requester.post(self.oa.player_list_url, headers={
+                "Referer": "https://ogladajanime.pl/anime/moja-akademia-bohaterow-6",
+                "Content-Length": str(len(data.encode())),
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+            }, data=data)))['text'])['data'])
+
+            if not player_list['players']:
+                print(Fore.RED + "Got empty test data from OglądajAnime.pl! Exitting, please check credentials aren't being rate limited." + Color.RESET)
+                return False
+        except Exception as e:
+            print(Fore.RED + "Couldn't get test data from OglądajAnime.pl! Exitting, please check credentials and if you aren't being rate limited: " + str(e) + Color.RESET)
+            return False
+
+        return True
 
     def load_settings(self, settings_path: str = "data/settings.json") -> dict:
         # Loads, checks if valid and corrects settings if necessary
@@ -223,6 +266,12 @@ class ProgramController:
                     return settings
                 else:
                     print(f"Invalid input. Please try again: ", end="")
+
+        if settings['downloaders']['video']['path_prefix'] == "[auto]":
+            settings['downloaders']['video']['path_prefix'] = Path("media").absolute()
+
+        if not Path(settings['downloaders']['video']['path_prefix']).exists():
+            os.makedirs(settings['downloaders']['video']['path_prefix'], exist_ok=True)
         
         return settings
 
@@ -338,8 +387,16 @@ class ProgramController:
                 asyncio.create_task(get_service_info(session, websocket, data, [self.oa]))
                 continue
 
-            if data.get('action') == 'get-player-info':
-                asyncio.create_task(get_player_info(session, websocket, data, [self.oa], self.database))
+            if data.get('action') == 'get-players-meta':
+                asyncio.create_task(get_players_meta(session, websocket, data, [self.oa], self.database))
+                continue
+
+            if data.get('action') == 'get-player-data':
+                asyncio.create_task(get_player_data(session, websocket, data, [self.oa], self.database))
+                continue
+
+            if data.get('action') == 'download-media':
+                asyncio.create_task(download_media(session, websocket, data, self.database))
                 continue
             
             print(f"Received: {data}")
@@ -350,6 +407,7 @@ class ProgramController:
             pass
 
     async def start(self):
+        await self.downloader.start()
         self.websocketserver.start(host=self.settings['socketserver']['host'], port=self.settings['socketserver']['port'], handler=self.handle_websocket, as_thread=True)
         self.webserver.run(self.settings['webserver']['host'], self.settings['webserver']['port'])
 
@@ -368,7 +426,10 @@ async def main():
         file.write(json.dumps([x.info() for x in await scrapper.search("My Hero Academia")], indent=4))
 
 if __name__ == "__main__":
-    asyncio.run(ProgramController(prepare=True).start())
+    pc = ProgramController(prepare=False)
+    if not pc.prepare():
+        exit()
+    asyncio.run(pc.start())
     #asyncio.run(main())
     
 #TODO: Asynchronously download thumbnails in background, and if already downloaded serve own url instead of upstream

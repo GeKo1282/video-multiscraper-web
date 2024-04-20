@@ -280,7 +280,7 @@ async def get_service_info(session: SocketSession, websocket: WebSocketClientPro
         "success": True
     }, session, unencrypted=True)
 
-async def get_player_info(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, services: List[Service], database: Database):
+async def get_players_meta(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, services: List[Service], database: Database):
     uid = data['data'].get('content_uid')
     user_id = data['data'].get('user_id', "")
     token = data['data'].get('token', "")
@@ -313,11 +313,71 @@ async def get_player_info(session: SocketSession, websocket: WebSocketClientProt
     else:
         episode: Union[Episode, Movie] = content
 
-    if not episode.is_scrapped:
-        await episode.get_sources(force_scrape=True)
+    await episode.get_sources(scrape=False)
 
     return await WebSocketServer.send(websocket, {
-        "action": "send-player-info",
+        "action": "send-players-meta",
         "data": episode.info("JSON"),
         "success": True
     }, session)
+
+async def get_player_data(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, services: List[Service], database: Database):
+    media_uid = data['data'].get('media_uid')
+    scrape = data['data'].get('scrape', False)
+    user_id = data['data'].get('user_id', "")
+    token = data['data'].get('token', "")
+
+    if not media_uid or not user_id or not token:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+    
+    if not authorize_user(user_id, token, database):
+        await send_error(websocket, session, "Invalid credentials.", code=111, action=data.get('action'), additional={
+            "success": False
+        })
+        return
+    
+    media = database.select("media", ["refer_id"], "uid = ?", [media_uid])
+
+    if not media:
+        await send_error(websocket, session, "Media not found.", action=data.get('action'))
+        return
+    
+    content = database.select("content", ["source", "meta"], "uid = ?", [media[0][0]])
+
+    if not content:
+        await send_error(websocket, session, "Content not found.", action=data.get('action'))
+        return
+    
+    service = next((service for service in services if content[0][0] in service.codenames), None)
+    episode = service.get_by_uid(media[0][0], False, False)
+
+    if not episode:
+        await send_error(websocket, session, "Episode not found.", action=data.get('action'))
+        return
+
+    if scrape:
+        await episode.get_sources(scrape=True, scrape_one=True, force_scrape=media_uid)
+
+    return await WebSocketServer.send(websocket, {
+        "action": "send-player-data",
+        "data": next((source for source in episode.info("JSON")['sources'] if source['uid'] == media_uid), None),
+        "success": True
+    }, session)
+
+async def download_media(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, database: Database):
+    uid = data['data'].get('content_uid')
+    user_id = data['data'].get('user_id', "")
+    token = data['data'].get('token', "")
+
+    if not uid or not user_id or not token:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+    
+    if not authorize_user(user_id, token, database):
+        await send_error(websocket, session, "Invalid credentials.", code=111, action=data.get('action'), additional={
+            "success": False
+        })
+        return
+    
+    content = database.select("media", ["refer_id"], "uid = ?", [uid])

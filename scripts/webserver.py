@@ -1,13 +1,17 @@
-from flask import Flask, Response, request, send_from_directory, redirect
+import json, asyncio
+from flask import Flask, Response, request, send_from_directory, redirect, stream_with_context
 from scripts.helper.http import Extender
 from scripts.helper.database import Database
+from scripts.helper.downloader import Downloader
 from typing import List, Callable, Tuple
 from urllib.parse import urlparse
 from pathlib import Path
 
 class WebExtender(Extender):
-    def __init__(self, database: Database) -> None:
-        self.database = database
+    def __init__(self, database: Database, downloader: Downloader) -> None:
+        self.database: Database = database
+        self.downloader: Downloader = downloader
+        self._standard_chunksize: int = 1024 ** 2 # 1MB
         self.register_paths()
 
     def register_paths(self,) -> List[Tuple[str, List[str], Callable]]:
@@ -19,7 +23,7 @@ class WebExtender(Extender):
             ("/", ["GET"], self.app),
             ("/<path:path>", ["GET"], self.app),
             ("/cdn/user/<id>/avatar", ["GET"], self.avatar),
-            ("/cdn/media/<content_id>/<resource>", ["GET"], self.cdn_media),
+            ("/cdn/media/<content_id>/<resource>", ["GET", "HEAD"], self.cdn_media),
         ]
 
     def script(self, path: str) -> Response:
@@ -56,30 +60,70 @@ class WebExtender(Extender):
         
         return Response(image_data[0][0], mimetype="image/png")
     
-    def cdn_media(self, content_id: str, resource: str) -> Response:
+    async def cdn_media(self, content_id: str, resource: str) -> Response:
+        def generator(media_id, start = 0, end = -1):
+            while True:
+                data = asyncio.run(self.downloader.request_instant(media_id, start, min(start + self._standard_chunksize - 1, end) if end != -1 else start + self._standard_chunksize - 1))
+                if not data:
+                    continue
+
+                yield data
+
+                if (start >= end and end != -1) or (end == -1 and not data):
+                    break
+                
+                start += self._standard_chunksize
+
+        range_start, range_end = [*[int(x) for x in request.headers.get("Range", None).split("=")[1].split("-") if x], -1][:2] if "Range" in request.headers else [0, -1]
         format = request.args.get("format", None)
         media_id = request.args.get("id", None)
-        content = self.database.select("media", ["media_type", "media_format", "media_id", "origin_url", "data", "refers_to"], f"refer_id = ? AND media_name = ? {'AND media_format = ? ' if format else ''}{'AND media_id = ? ' if media_id else ''}", [content_id, resource, *([format] if format else []), *([media_id] if media_id else [])])
+        content = self.database.select("media", ["id", "media_type", "media_format", "media_id", "metadata", "origin_url", "data_path", "refers_to"], f"refer_id = ? AND media_name = ? {'AND media_format = ? ' if format else ''}{'AND media_id = ? ' if media_id else ''}", [content_id, resource, *([format] if format else []), *([media_id] if media_id else [])])
 
         if not content:
             return "Invalid request", 400
         
-        while content[0][5]:
-            new_content = self.database.select("media", ["media_type", "media_format", "media_id", "origin_url", "data", "refers_to"], f"id = ?", [content[0][5]])
+        while content[0][6]:
+            new_content = self.database.select("media", ["id", "media_type", "media_format", "media_id", "metadata", "origin_url", "data_path", "refers_to"], f"id = ?", [content[0][5]])
             
             if not new_content:
                 return "Invalid request", 400
             
             content = (
-                content[0][0],
+                new_content[0][0],
                 content[0][1],
                 content[0][2],
                 content[0][3],
-                new_content[0][4],
-                new_content[0][5]
+                content[0][4],
+                content[0][5],
+                new_content[0][6],
+                new_content[0][7]
             )
 
-        if not content[0][4]:
-            return redirect(content[0][3])
+        if request.method == "HEAD":
+            return Response(
+                b"",
+                status=200,
+                headers={
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": await self.downloader.get_content_size(content[0][0]),
+                    "Content-Type": f"{content[0][1]}/{content[0][2] if content[0][2] else 'plain'}"
+                }
+            )
+
+        if not content[0][6] and not json.loads(content[0][4]).get("source") == "cda":
+            return redirect(content[0][5])
         
-        return Response(content[0][4], mimetype=f"{content[0][0]}/{content[0][1] if content[0][1] else 'plain'}")
+        return Response(
+            generator(content[0][0], range_start, range_end),
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Type": f"{content[0][1]}/{content[0][2] if content[0][2] else 'plain'}",
+                "Content-Length": range_end - range_start if range_end != -1 else await self.downloader.get_content_size(content[0][0]),
+                **({
+                    "Content-Range": f"bytes {range_start}-{range_end - 1 if range_end != -1 else await self.downloader.get_content_size(content[0][0]) - 1}/{await self.downloader.get_content_size(content[0][0])}",
+                } if request.headers.get("Range", None) else {})
+            },
+            mimetype=f"{content[0][1]}/{content[0][2] if content[0][2] else 'plain'}",
+            status=206 if request.headers.get("Range", None) else 200,
+            direct_passthrough=True
+        )
