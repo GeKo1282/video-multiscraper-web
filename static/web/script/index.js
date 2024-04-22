@@ -154,7 +154,7 @@ function assign_handlers() {
     document.getElementById('search-bar').getElementsByClassName('search-input')[0].addEventListener('keydown', async (event) => {
         if (event.key == 'Enter') {
             event.preventDefault();
-            update_search_suggestions([]);
+            update_search_suggestions([], "");
             if (document.activeElement == document.getElementById('search-bar').getElementsByClassName('search-input')[0]) document.activeElement.blur();
             await search();
         }
@@ -214,22 +214,22 @@ async function search() {
 }
 
 async function get_search_suggestions(event) {
-    let value = document.getElementById('search-bar').getElementsByClassName('search-input')[0].value;
+    let value = normalize(sanitize(document.getElementById('search-bar').getElementsByClassName('search-input')[0].value));
 
     if (value.length == 0) {
-        update_search_suggestions([]);
+        update_search_suggestions([], "");
         return;
     }
 
     if(event.key == 'Enter') return;
     if (event.key == 'ArrowDown' || event.key == 'ArrowUp') return;
     if (event.key == 'Escape') {
-        update_search_suggestions([]);
+        update_search_suggestions([], "");
         return;
     }
 
     if (global.search_suggestions_cache && global.search_suggestions_cache[value]) {
-        update_search_suggestions(global.search_suggestions_cache[value]);
+        update_search_suggestions(global.search_suggestions_cache[value], value);
         return;
     }
 
@@ -238,8 +238,8 @@ async function get_search_suggestions(event) {
 
         if (!global.search_suggestions_cache) global.search_suggestions_cache = {};
 
-        global.search_suggestions_cache[decrypted.data.query] = decrypted.data.suggestions;
-        update_search_suggestions(decrypted.data.suggestions);
+        global.search_suggestions_cache[normalize(sanitize(decrypted.data.query))] = decrypted.data.suggestions;
+        update_search_suggestions(decrypted.data.suggestions, decrypted.data.query);
         global.websocket.remove_onmessage(self);
         return;
     });
@@ -286,7 +286,9 @@ function switch_user_menu() {
     }
 }
 
-function update_search_suggestions(suggestions, assign_handler = true) {
+function update_search_suggestions(suggestions, query = "", assign_close_handler = true, force = false) {
+    if (((normalize(sanitize(document.getElementById('search-bar').getElementsByClassName('search-input')[0].value)) != normalize(sanitize(query)) && (query && suggestions)) || document.getElementById('search-bar').getElementsByClassName('search-input')[0] != document.activeElement) && !force) return;
+    
     let suggestions_box = document.getElementById('search-bar').getElementsByClassName('search-suggestions')[0];
     if (suggestions.length == 0) { suggestions_box.classList.remove('shown'); return; }
     suggestions_box.innerHTML = '';
@@ -305,7 +307,7 @@ function update_search_suggestions(suggestions, assign_handler = true) {
 
     suggestions_box.classList.add('shown');
 
-    if (!assign_handler) return;
+    if (!assign_close_handler) return;
 
     let old_callback = document.onclick;
 
@@ -648,6 +650,8 @@ async function play(episode_or_series_uid, optional_episode_index = -1) {
                         global.websocket.pass_onmessage(self, decrypted, _);
                         return;
                     }
+
+                    console.log(decrypted)
 
                     global.websocket.remove_onmessage(self);
                     resolve(decrypted.data);

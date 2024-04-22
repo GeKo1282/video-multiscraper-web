@@ -354,3 +354,23 @@ function changeFavicon(src) {
     
     document.head.appendChild(link);
 }
+
+function strip(string, character = " ") {
+    while (string.startsWith(character)) {
+        string = string.substring(1);
+    }
+
+    while (string.endsWith(character)) {
+        string = string.substring(0, string.length - 1);
+    }
+
+    return string;
+}
+
+function sanitize(string) {
+    return strip(string)
+}
+
+function normalize(string) {
+    return string.toLowerCase();
+}

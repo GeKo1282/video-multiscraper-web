@@ -253,7 +253,7 @@ async def get_content_info(session: SocketSession, websocket: WebSocketClientPro
     content = oa.get_by_uid(uid, True, True)
 
     if type(content) in [OA_Movie, OA_Series] and not content.is_scrapped:
-        await content.scrape()
+        content = await content.scrape()
 
     await WebSocketServer.send(websocket, {
         "action": "send-content-info",
@@ -307,7 +307,10 @@ async def get_players_meta(session: SocketSession, websocket: WebSocketClientPro
 
     if isinstance(content, Series):
         if not content.is_scrapped:
-            await content.scrape()
+            content = await content.scrape()
+
+        if not isinstance(content, Series):
+            episode: Union[Episode, Movie] = content
 
         episode: Episode = content.episodes[0]
     else:
@@ -357,11 +360,11 @@ async def get_player_data(session: SocketSession, websocket: WebSocketClientProt
         return
 
     if scrape:
-        await episode.get_sources(scrape=True, scrape_one=True, force_scrape=media_uid)
+        await episode.get_sources(scrape=True, scrape_one=True, force_scrape=[str(media_uid)])
 
     return await WebSocketServer.send(websocket, {
         "action": "send-player-data",
-        "data": next((source for source in episode.info("JSON")['sources'] if source['uid'] == media_uid), None),
+        "data": next((source for source in episode.info("JSON")['sources'] if str(source['uid']) == str(media_uid)), None),
         "success": True
     }, session)
 

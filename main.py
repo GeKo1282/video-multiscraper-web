@@ -134,14 +134,17 @@ class ProgramController:
             "metadata TEXT NOT NULL DEFAULT '{}'", #used for storing metadata about the media, eg. length, resolution, quality, etc.
             
             "media_type TEXT NOT NULL", #eg. video, image, audio
-            "media_format TEXT NOT NULL",
+            "media_format TEXT",
             "media_name TEXT NOT NULL", #eg. thumbnail, video, opening, etc. Used for geting through url.
             "media_id TEXT NOT NULL", #for when there is more than one media of the same type for the same content, eg. multiple resolutions or thumbnails.
             # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}][&meta_arg=meta_val]: /media/1234/thumbnail, /media/1234/opening?format=mp4, /media/1234/video?format=mp4&id=1080p, /media/1234/thumbnail?id=1
             
-            "origin_url TEXT UNIQUE DEFAULT NULL",
-            "data_path TEXT DEFAULT NULL",
-            "refers_to TEXT REFERENCES media(id) DEFAULT NULL"
+            "origin_url TEXT DEFAULT NULL",
+            "data_path TEXT UNIQUE DEFAULT NULL",
+            "refers_to TEXT REFERENCES media(id) DEFAULT NULL",
+
+            "UNIQUE(refer_id, media_name, media_id)",
+            "UNIQUE(refer_id, origin_url)"
         ])
 
         self.database.create_table("small_tokens", [
@@ -325,6 +328,8 @@ class ProgramController:
 
         aes_cipher = AESCipher(False)
 
+        #TODO: Tryexcept all the things and send "Unknown error" if something goes wrong
+
         while True:
             try:
                 data: Union[dict, str] = await decrypt(await websocket.recv(), session)
@@ -333,6 +338,8 @@ class ProgramController:
             except CouldNotLoadData:
                 asyncio.create_task(send_error(websocket, session, "Could not read data."))
                 continue
+
+            print(f"Received: {data.get('action') if isinstance(data, dict) else data}")
 
             if data.get('action') == 'get-rsa-key':
                 asyncio.create_task(get_rsa_key(session, websocket, self.rsa))
