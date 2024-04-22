@@ -3,7 +3,7 @@ from flask import Flask, Response, request, send_from_directory, redirect, strea
 from scripts.helper.http import Extender
 from scripts.helper.database import Database
 from scripts.helper.downloader import Downloader
-from typing import List, Callable, Tuple
+from typing import List, Callable, Tuple, Dict
 from urllib.parse import urlparse
 from pathlib import Path
 
@@ -62,8 +62,11 @@ class WebExtender(Extender):
     
     async def cdn_media(self, content_id: str, resource: str) -> Response:
         def generator(media_id, start = 0, end = -1):
+            if end == -1:
+                end = asyncio.run(self.downloader.get_content_size(media_id))
+
             while True:
-                data = asyncio.run(self.downloader.request_instant(media_id, start, min(start + self._standard_chunksize - 1, end) if end != -1 else start + self._standard_chunksize - 1))
+                data = asyncio.run(self.downloader.request_instant(media_id, start, min(start + self._standard_chunksize - 1, end)))
                 if not data:
                     continue
 
@@ -77,13 +80,14 @@ class WebExtender(Extender):
         range_start, range_end = [*[int(x) for x in request.headers.get("Range", None).split("=")[1].split("-") if x], -1][:2] if "Range" in request.headers else [0, -1]
         format = request.args.get("format", None)
         media_id = request.args.get("id", None)
-        content = self.database.select("media", ["id", "media_type", "media_format", "media_id", "metadata", "origin_url", "data_path", "refers_to"], f"refer_id = ? AND media_name = ? {'AND media_format = ? ' if format else ''}{'AND media_id = ? ' if media_id else ''}", [content_id, resource, *([format] if format else []), *([media_id] if media_id else [])])
+        token = request.args.get("token", None)
+        content = self.database.select("media", ["id", "media_type", "media_format", "media_id", "metadata", "origin_url", "data_path", "refers_to", "requires_token"], f"refer_id = ? AND media_name = ? {'AND media_format = ? ' if format else ''}{'AND media_id = ? ' if media_id else ''}", [content_id, resource, *([format] if format else []), *([media_id] if media_id else [])])
 
         if not content:
             return "Invalid request", 400
         
         while content[0][6]:
-            new_content = self.database.select("media", ["id", "media_type", "media_format", "media_id", "metadata", "origin_url", "data_path", "refers_to"], f"id = ?", [content[0][5]])
+            new_content = self.database.select("media", ["id", "media_type", "media_format", "media_id", "metadata", "origin_url", "data_path", "refers_to", "requires_token"], f"id = ?", [content[0][5]])
             
             if not new_content:
                 return "Invalid request", 400
@@ -96,9 +100,17 @@ class WebExtender(Extender):
                 content[0][4],
                 content[0][5],
                 new_content[0][6],
-                new_content[0][7]
+                new_content[0][7],
+                new_content[0][8]
             )
 
+        if content[0][8]:
+            if not token:
+                return "Unauthorized", 401
+
+            if not self.database.select("media_tokens", ["id"], "token = ? AND media_id = ?", [token, content[0][0]]):
+                return "Unauthorized", 401
+            
         if request.method == "HEAD":
             return Response(
                 b"",

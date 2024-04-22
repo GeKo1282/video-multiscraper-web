@@ -184,5 +184,7 @@ class SocketSession:
         self.user_token: str = None
         self.authorized: bool = False
 
+        self.media_token_lifetime: int = None
+
 class AddressAlreadyBoundError(Exception):
     pass

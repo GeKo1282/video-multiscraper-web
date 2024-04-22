@@ -1006,7 +1006,8 @@ class OgladajAnime_pl(Service):
                 "media_id",
                 "origin_url",
                 "data_path",
-                "refers_to"
+                "refers_to",
+                "requires_token"
             ], [
                 uid,
                 owner.uid,
@@ -1018,7 +1019,8 @@ class OgladajAnime_pl(Service):
                 media_id,
                 url,
                 None,
-                None
+                None,
+                media_name == "episode"
             ], "uid = ?", [uid])
         elif existing:
             refers_to = existing[0][2] or existing[0][0]
@@ -1033,7 +1035,8 @@ class OgladajAnime_pl(Service):
                     "media_id",
                     "origin_url",
                     "data_path",
-                    "refers_to"
+                    "refers_to",
+                    "requires_token"
                 ], [
                     uid,
                     owner.uid,
@@ -1045,7 +1048,8 @@ class OgladajAnime_pl(Service):
                     media_id,
                     None,
                     None,
-                    refers_to
+                    refers_to,
+                    media_name == "episode"
                 ]
             )
             
@@ -1061,7 +1065,8 @@ class OgladajAnime_pl(Service):
                     "media_id",
                     "origin_url",
                     "data_path",
-                    "refers_to"
+                    "refers_to",
+                    "requires_token"
                 ], [
                     uid,
                     owner.uid,
@@ -1073,7 +1078,8 @@ class OgladajAnime_pl(Service):
                     media_id,
                     url,
                     None,
-                    None
+                    None,
+                    media_name == "episode"
                 ]
             )
 

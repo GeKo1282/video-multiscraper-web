@@ -7,7 +7,7 @@ from scripts.helper.database import Database
 from scripts.helper.util import generate_id, sha512
 from scripts.scrappers import OgladajAnime_pl, OA_Movie, OA_Series, Service, Movie, Series, Episode
 from websockets import WebSocketClientProtocol
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Union, Optional
 
 def authorize_user(id: str, token: str, database: Database) -> bool:
@@ -147,8 +147,9 @@ async def register(session: SocketSession, websocket: WebSocketClientProtocol, d
     user_token = hex(int(datetime.now().timestamp()))[2:] + sha512(user_id)[:24] + generate_id(length=32, type="hex")
 
     database.insert("users",
-    ["id", "email", "username", "displayname", "password", "salt", "token", "settings", "image", "last_login", "confirmed", "deleted", "suspended"],
-    [user_id, email, username, displayname, password, salt, user_token, "{}", None, datetime.now(), True, False, False])
+    ["id", "email", "username", "displayname", "password", "salt", "token", "settings", "image", "last_login", "created", "confirmed", "deleted", "suspended"],
+    [user_id, email, username, displayname, password, salt, user_token, "{}", None, int(datetime.now().timestamp()), int(datetime.now().timestamp()), True, False, False]
+    )
 
     await WebSocketServer.send(websocket, {
         "action": "send-user-auth",
@@ -329,6 +330,24 @@ async def get_player_data(session: SocketSession, websocket: WebSocketClientProt
     scrape = data['data'].get('scrape', False)
     user_id = data['data'].get('user_id', "")
     token = data['data'].get('token', "")
+    
+    async def enrich_media_token(source_info: dict) -> dict:
+        media_token = await get_media_token(session, websocket, {
+            "data": {
+                "media_uid": source_info['uid'],
+                "user_id": user_id,
+                "token": token
+            }
+        }, database, return_data=True)
+
+        source_info['media_token'] = {
+            "token": media_token['token'],
+            "expires": media_token['expires']
+        }
+
+        source_info['url'] = source_info['url'] + "&token=" + media_token['token'] if "?" in source_info['url'] else source_info['url'] + "?token=" + media_token['token']
+
+        return source_info
 
     if not media_uid or not user_id or not token:
         await send_error(websocket, session, "Invalid data.", action=data.get('action'))
@@ -364,7 +383,52 @@ async def get_player_data(session: SocketSession, websocket: WebSocketClientProt
 
     return await WebSocketServer.send(websocket, {
         "action": "send-player-data",
-        "data": next((source for source in episode.info("JSON")['sources'] if str(source['uid']) == str(media_uid)), None),
+        "data": await enrich_media_token(next((source for source in episode.info("JSON")['sources'] if str(source['uid']) == str(media_uid)), None)),
+        "success": True
+    }, session)
+
+async def get_media_token(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, database: Database, return_data: bool = False):
+    media_uid = data['data'].get('media_uid')
+    user_id = data['data'].get('user_id', "")
+    token = data['data'].get('token', "")
+
+    if not media_uid or not user_id or not token:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+    
+    if not authorize_user(user_id, token, database):
+        await send_error(websocket, session, "Invalid credentials.", code=111, action=data.get('action'), additional={
+            "success": False
+        })
+        return
+    
+    media = database.select("media", ["id"], "uid = ?", [media_uid])
+    if not media:
+        await send_error(websocket, session, "Media not found.", action=data.get('action'))
+        return
+    
+    ttoken = database.select("media_tokens", ["token", "expires"], "media_id = ? AND user_id = ? AND expires > ?", [media[0][0], user_id, int((datetime.now() + timedelta(minutes=5)).timestamp())])
+
+    if not ttoken:
+        ttoken = generate_id()
+        expires = int((datetime.now() + timedelta(seconds=session.media_token_lifetime)).timestamp())
+
+        database.insert("media_tokens", ["media_id", "user_id", "token", "created", "expires"], [media[0][0], user_id, ttoken, int(datetime.now().timestamp()), expires])
+    else:
+        ttoken, expires = ttoken[0]
+
+    if return_data:
+        return {
+            "token": ttoken,
+            "expires": expires
+        }
+    
+    await WebSocketServer.send(websocket, {
+        "action": "send-media-token",
+        "data": {
+            "token": ttoken,
+            "expires": expires
+        },
         "success": True
     }, session)
 

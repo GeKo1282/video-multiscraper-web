@@ -1,4 +1,4 @@
-import json, os, base64, asyncio
+import json, os, base64, asyncio, threading, functools
 from typing import List, Optional, AnyStr, Tuple, Any, Literal, Union, Callable, Dict
 from pathlib import Path
 from threading import Thread
@@ -43,7 +43,8 @@ class ProgramController:
                 "port": 5001
             },
             "database": {
-                "path": "data/database.db"
+                "path": "data/database.db",
+                "media_token_lifetime": 3600
             },
             "downloaders": {
                 "video": {
@@ -58,7 +59,7 @@ class ProgramController:
         if prepare:
             self.prepare()
 
-    def prepare(self):
+    async def prepare(self):
         self.settings = self.load_settings()
 
         self.database = Database(self.settings['database']['path'])
@@ -102,8 +103,8 @@ class ProgramController:
             "token TEXT NOT NULL",
             "settings TEXT NOT NULL DEFAULT '{}'",
             "image BLOB",
-            "last_login DATETIME NOT NULL",
-            "created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            "last_login INTEGER NOT NULL",
+            "created INTEGER NOT NULL",
             "confirmed BOOLEAN NOT NULL DEFAULT FALSE",
             "deleted BOOLEAN NOT NULL DEFAULT FALSE",
             "suspended BOOLEAN NOT NULL DEFAULT FALSE"
@@ -147,19 +148,19 @@ class ProgramController:
             "UNIQUE(refer_id, origin_url)"
         ])
 
-        self.database.create_table("small_tokens", [
+        self.database.create_table("media_tokens", [
             "id INTEGER PRIMARY KEY AUTOINCREMENT",
 
             "user_id TEXT REFERENCES users(id) NOT NULL",
             "media_id TEXT REFERENCES media(id) NOT NULL",
             "token TEXT NOT NULL",
-            "created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
-            "expires DATETIME NOT NULL"
+            "created INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            "expires INTEGER NOT NULL"
         ])
 
         self.database.create_table("temporary_media_data", [
             "id INTEGER PRIMARY KEY AUTOINCREMENT",
-            "media_id TEXT REFERENCES media(id) NOT NULL",
+            "media_id INT REFERENCES media(id) NOT NULL",
             "start_byte INTEGER NOT NULL",
             "end_byte INTEGER NOT NULL",
             "data BLOB NOT NULL",
@@ -175,11 +176,11 @@ class ProgramController:
 
         try:
             data = "id=207638"
-            player_list = json.loads(json.loads((asyncio.run(oa_requester.post(self.oa.player_list_url, headers={
+            player_list = json.loads(json.loads((await oa_requester.post(self.oa.player_list_url, headers={
                 "Referer": "https://ogladajanime.pl/anime/moja-akademia-bohaterow-6",
                 "Content-Length": str(len(data.encode())),
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
-            }, data=data)))['text'])['data'])
+            }, data=data))['text'])['data'])
 
             if not player_list['players']:
                 print(Fore.RED + "Got empty test data from OglądajAnime.pl! Exitting, please check credentials aren't being rate limited." + Color.RESET)
@@ -278,7 +279,7 @@ class ProgramController:
         
         return settings
 
-    async def detach(self, callback: Callable, executor: Union[Callable, Thread] = Thread, *args, **kwargs) -> Thread:
+    def detach(self, callback: Callable, executor: Union[Callable, Thread] = Thread, *args, **kwargs) -> Thread:
         thread = executor(target=callback, args=args, kwargs=kwargs)
         thread.start()
         return thread
@@ -326,6 +327,8 @@ class ProgramController:
         session.public_rsa_key = None
         session.aes_key = None
 
+        session.media_token_lifetime = self.settings['database']['media_token_lifetime']
+
         aes_cipher = AESCipher(False)
 
         #TODO: Tryexcept all the things and send "Unknown error" if something goes wrong
@@ -338,8 +341,6 @@ class ProgramController:
             except CouldNotLoadData:
                 asyncio.create_task(send_error(websocket, session, "Could not read data."))
                 continue
-
-            print(f"Received: {data.get('action') if isinstance(data, dict) else data}")
 
             if data.get('action') == 'get-rsa-key':
                 asyncio.create_task(get_rsa_key(session, websocket, self.rsa))
@@ -402,6 +403,10 @@ class ProgramController:
                 asyncio.create_task(get_player_data(session, websocket, data, [self.oa], self.database))
                 continue
 
+            if data.get('action') == 'get-media-token':
+                asyncio.create_task(get_media_token(session, websocket, data, self.database))
+                continue
+
             if data.get('action') == 'download-media':
                 asyncio.create_task(download_media(session, websocket, data, self.database))
                 continue
@@ -414,29 +419,17 @@ class ProgramController:
             pass
 
     async def start(self):
-        await self.downloader.start()
+        self.downloader.start()
         self.websocketserver.start(host=self.settings['socketserver']['host'], port=self.settings['socketserver']['port'], handler=self.handle_websocket, as_thread=True)
-        self.webserver.run(self.settings['webserver']['host'], self.settings['webserver']['port'])
+        threading.Thread(self.webserver.run(host=self.settings['webserver']['host'], port=self.settings['webserver']['port'])).start()
 
 async def main():
-    Requester("oa-requester",
-     default_headers={
-        "Referer": "https://ogladajanime.pl",
-        "X-Requested-With": "XMLHttpRequest"
-     },
-     max_requests_per_minute=20, max_requests_per_second=20,
-     default_user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
-    )
-
-    scrapper = OgladajAnime_pl(requester=Requester.get_requester("oa-requester"))
-    with open("search.json", "w") as file:
-        file.write(json.dumps([x.info() for x in await scrapper.search("My Hero Academia")], indent=4))
+    pc = ProgramController(prepare=False)
+    if not await pc.prepare():
+        exit()
+    await pc.start()
 
 if __name__ == "__main__":
-    pc = ProgramController(prepare=False)
-    if not pc.prepare():
-        exit()
-    asyncio.run(pc.start())
-    #asyncio.run(main())
+    asyncio.run(main())
     
 #TODO: Asynchronously download thumbnails in background, and if already downloaded serve own url instead of upstream
