@@ -219,11 +219,11 @@ class Downloader:
                 new_queue_start = [(media_id, cutout[0], cutout[1], chunk_size, None) for cutout in cutouts]
                 new_queue_start[-1] = (media_id, new_queue_start[-1][1], new_queue_start[-1][2], chunk_size, flag)
                 if queue_type == "top_priority":
-                    del self._top_priority_queue[0]
+                    self._top_priority_queue = new_queue_start + self._top_priority_queue[1:]
                 elif queue_type == "buffer":
-                    del self._buffer_queue[0]
+                    self._buffer_queue = new_queue_start + self._buffer_queue[1:]
                 else:
-                    del self._queue[0]               
+                    self._queue = new_queue_start + self._queue[1:]              
                 continue
             
             colliding_requests = [request for request in self._requests_in_progress if request[0] == media_id and request[1] <= start <= request[2] or request[1] <= end <= request[2]]

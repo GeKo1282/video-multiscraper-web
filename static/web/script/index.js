@@ -185,6 +185,16 @@ function assign_handlers() {
             search_input.value = suggestions[index].innerText;
         }
     });
+
+    document.getElementById('video-player').addEventListener("play", () => {
+        document.querySelector('#video-player-window .controls .play-pause .play-icon').classList.add('hidden');
+        document.querySelector('#video-player-window .controls .play-pause .pause-icon').classList.remove('hidden');
+    })
+
+    document.getElementById('video-player').addEventListener("pause", () => {
+        document.querySelector('#video-player-window .controls .play-pause .play-icon').classList.remove('hidden');
+        document.querySelector('#video-player-window .controls .play-pause .pause-icon').classList.add('hidden');
+    }) 
 }
 
 async function search() {
@@ -678,4 +688,13 @@ async function open_video_player(url, autoplay = false) {
 function close_video_player() {
     document.getElementById('video-player').pause();
     document.getElementById('video-player-window').classList.remove('shown');
+}
+
+function playpause() {
+    let video = document.getElementById('video-player');
+    if (video.paused) {
+        video.play();
+    } else {
+        video.pause();
+    }
 }

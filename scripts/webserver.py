@@ -62,11 +62,14 @@ class WebExtender(Extender):
     
     async def cdn_media(self, content_id: str, resource: str) -> Response:
         def generator(media_id, start = 0, end = -1):
+            print("Generating for", media_id, start, end)
             if end == -1:
                 end = asyncio.run(self.downloader.get_content_size(media_id))
 
             while True:
+                print("Waiting for:", start, min(start + self._standard_chunksize - 1, end))
                 data = asyncio.run(self.downloader.request_instant(media_id, start, min(start + self._standard_chunksize - 1, end)))
+                print("Got data:", len(data) if data else 0, start, min(start + self._standard_chunksize - 1, end))
                 if not data:
                     continue
 

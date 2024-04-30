@@ -1,4 +1,4 @@
-import json, os, base64, asyncio, threading, functools
+import json, os, base64, asyncio, threading, sys
 from typing import List, Optional, AnyStr, Tuple, Any, Literal, Union, Callable, Dict
 from pathlib import Path
 from threading import Thread
@@ -173,6 +173,9 @@ class ProgramController:
         host = self.settings['socketserver']['host'] if self.settings['socketserver']['host'] != self.settings['webserver']['host'] and not self.settings['socketserver']['host'] == "0.0.0.0" else ""
         self.webserver.add_path("/", ["POST"], APIExtender(socket_host=host, socket_port=self.settings['socketserver']['port'], public_rsa_key=self.rsa.public_key()))
         self.webserver.extend(WebExtender(database=self.database, downloader=self.downloader))
+
+        if any([arg == "--debug-mode" for arg in sys.argv]):
+            return True
 
         try:
             data = "id=207638"

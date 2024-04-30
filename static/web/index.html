@@ -142,12 +142,80 @@
                 </div>
             </div>
 
-            <div id="video-player-window" class="window">
+            <div id="video-player-window" class="window shown">
                 <div class="close-button" onclick="close_video_player()">
                     <div class="icon" data-icon="x"></div>
                 </div>
 
                 <div class="video-player">
+                    <div class="controls" style="pointer-events: none;">
+                        <div class="top">
+                            <div class="title">NONE</div>
+                        </div>
+                        <div class="bottom">
+                            <div class="upper">
+                                <div class="progress-bar"></div>
+                            </div>
+
+                            <div class="lower">
+                                <div class="panel-left">
+                                    <div class="icon button icon-previous" data-icon="caret-left"></div>
+
+                                    <div class="play-pause button" onclick="playpause()">
+                                        <div class="icon play-icon" data-icon="play"></div>
+                                        <div class="icon pause-icon hidden" data-icon="pause"></div>
+                                    </div>
+
+                                    <div class="icon button icon-next" data-icon="caret-right"></div>
+
+                                    <div class="volume-control button">
+                                        <div class="icons">
+                                            <div class="icon speaker-loud-icon" data-icon="volume-up"></div>
+                                            <div class="icon speaker-icon hidden" data-icon="volume-down"></div>
+                                            <div class="icon speaker-muted-icon hidden" data-icon="volume-muted"></div>
+                                        </div>
+
+                                        <div class="slider-box">
+                                            <input type="range" class="volume-slider" min="0" max="100" value="100" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="panel-right">
+                                    <div class="fullscreen-control button">
+                                        <div class="icon icon-fullscreen" data-icon="fullscreen"></div>
+                                        <div class="icon icon-fullscreen-exit hidden" data-icon="fullscreen-exit"></div>
+                                    </div>
+                                    
+                                    <div class="settings button">
+                                        <div class="icon icon-settings" data-icon="gear"></div>
+                                        <div class="settings-menu">
+                                            <div class="option quality-option">
+                                                <div class="quality-icons">
+                                                    <div class="icon quality-icon hidden" data-icon="badge-4k"></div>
+                                                    <div class="icon quality-icon hidden" data-icon="badge-hd"></div>
+                                                    <div class="icon quality-icon hidden" data-icon="badge-sd"></div>
+                                                </div>
+                                            </div>
+
+                                            <div class="option subtitles-option">
+                                                <div class="icon" data-icon="card-text"></div>
+                                                <div class="label">None</div>
+                                            </div>
+
+                                            <div class="option sources-option">
+                                                <div class="label">Sources</div>
+                                                <datalist class="sources-list"></datalist>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="subtitles-switch button">
+                                        <div class="icon subtitles-icon" data-icon="card-text"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <video id="video-player" controls></video>
                 </div>
             </div>
