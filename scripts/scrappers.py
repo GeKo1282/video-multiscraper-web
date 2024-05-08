@@ -903,6 +903,8 @@ class OA_Episode(Episode):
         if not media:
             raise ValueError("Media not found in database!")
 
+        print(f"Downloading: {start}-{end}")
+
         return (await requester.get(media[0][0], headers={
             "Referer": media[0][0],
             "Range": f"bytes={start}-{end}",

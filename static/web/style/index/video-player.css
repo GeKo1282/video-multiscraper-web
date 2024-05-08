@@ -63,7 +63,7 @@ body.animate #video-player-window {
 }
 
 #video-player-window .controls .bottom {
-    height: 42px;
+    gap: 20px;
     width: 100%;
 
     display: flex;
@@ -73,11 +73,35 @@ body.animate #video-player-window {
 #video-player-window .controls .bottom .upper {
     height: 2px;
     width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#video-player-window .controls .bottom .upper .progress-bar {
+    width: calc(100% - 10px);
+    height: 100%;
+    background: #444;
+    position: relative;
+
+    --fill-color: darkviolet;
+}
+
+#video-player-window .controls .bottom .upper .progress-bar .progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: var(--fill-color);
+    transform-origin: bottom left;
+    transform: scaleX(0);
 }
 
 #video-player-window .controls .bottom .lower {
     width: 100%;
-    height: calc(100% - 2px);
+    height: 40px;
 
     display: flex;
     align-items: center;

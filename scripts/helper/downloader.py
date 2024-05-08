@@ -19,7 +19,7 @@ class Downloader:
         self._top_priority_queue: List[Tuple[str, int, int, int, Optional[Tuple[asyncio.Event, asyncio.AbstractEventLoop]]]] = []
         self._buffer_queue: List[Tuple[str, int, int, int, Optional[Tuple[asyncio.Event, asyncio.AbstractEventLoop]]]] = []
         self._queue: List[Tuple[str, int, int, int, Optional[Tuple[asyncio.Event, asyncio.AbstractEventLoop]]]] = []
-        self._requests_in_progress: List[Tuple[str, int, int]] = []
+        self._requests_in_progress: List[Tuple[str, int, int, Optional[List[Tuple[asyncio.Event, asyncio.AbstractEventLoop]]]]] = []
 
         self._running: bool = False
 
@@ -58,13 +58,26 @@ class Downloader:
 
         await flag.wait()
 
+        #Check if data is in database before returning, because every chunk causes flag to be set
         out_data = b""
         chunks = self.database.select("temporary_media_data", ["start_byte", "end_byte", "data"], "media_id = ? AND (NOT start_byte > ? AND NOT end_byte < ?)", [media_id, end, start])
         print(f"Chunks colliding for {Fore.RED}{start}-{end}{Color.RESET}: {[(chunk[0], chunk[1]) for chunk in chunks]}")
         
         for chunk in chunks:
-            print("Chunk:", chunk[0], chunk[1], "Returning from chunk:", start + len(out_data) - chunk[0], end + len(out_data) - chunk[0] + 1)
-            out_data += chunk[2][start + len(out_data) - chunk[0]:end + len(out_data) - chunk[0] + 1]
+            print("Chunk:", chunk[0], chunk[1], "Returning from chunk:", start + len(out_data) - chunk[0], end - chunk[0] + 1)
+            out_data += chunk[2][start + len(out_data) - chunk[0]:end - chunk[0] + 1]
+
+        while len(out_data) < end - start + 1:
+            flag.clear()
+            await flag.wait()
+
+            out_data = b""
+            chunks = self.database.select("temporary_media_data", ["start_byte", "end_byte", "data"], "media_id = ? AND (NOT start_byte > ? AND NOT end_byte < ?)", [media_id, end, start])
+            print(f"Chunks colliding for {Fore.RED}{start}-{end}{Color.RESET}: {[(chunk[0], chunk[1]) for chunk in chunks]}")
+
+            for chunk in chunks:
+                print("Chunk:", chunk[0], chunk[1], "Returning from chunk:", start + len(out_data) - chunk[0], end - chunk[0] + 1)
+                out_data += chunk[2][start + len(out_data) - chunk[0]:end - chunk[0] + 1]
 
         print("Retruning data:", start, end, len(out_data))
 
@@ -173,11 +186,16 @@ class Downloader:
                 data
             ])
 
-            self._requests_in_progress.remove((media_id, start, end))
+            rip = next((request for request in self._requests_in_progress if request[0] == media_id and request[1] == start and request[2] == end), None)
+            self._requests_in_progress.remove(rip)
             downloader_tasks.remove(asyncio.current_task())
 
             if flag:
                 self.set_flag_in_loop(flag[0], flag[1])
+
+            if rip[3]:
+                for flag in rip[3]:
+                    self.set_flag_in_loop(flag[0], flag[1])
 
             self.set_downloader_flag()
 
@@ -200,7 +218,6 @@ class Downloader:
                     self._queue[0] = (media_id, start + chunk_size, end, chunk_size, flag)
 
                 end = start + chunk_size
-                flag = None
 
             colliding_chunks = self.database.select("temporary_media_data", ["start_byte", "end_byte"], "media_id = ? AND (NOT start_byte > ? AND NOT end_byte < ?)", [media_id, end, start])
             if colliding_chunks:
@@ -216,8 +233,7 @@ class Downloader:
                         self.set_flag_in_loop(flag[0], flag[1])
                     continue
                 
-                new_queue_start = [(media_id, cutout[0], cutout[1], chunk_size, None) for cutout in cutouts]
-                new_queue_start[-1] = (media_id, new_queue_start[-1][1], new_queue_start[-1][2], chunk_size, flag)
+                new_queue_start = [(media_id, cutout[0], cutout[1], chunk_size, flag) for cutout in cutouts]
                 if queue_type == "top_priority":
                     self._top_priority_queue = new_queue_start + self._top_priority_queue[1:]
                 elif queue_type == "buffer":
@@ -237,13 +253,13 @@ class Downloader:
                     else:
                         del self._queue[0]
 
+                    last_request = colliding_requests[-1]
                     if flag:
-                        self.set_flag_in_loop(flag[0], flag[1])
+                        self._requests_in_progress[self._requests_in_progress.index(last_request)][3].append(flag)
 
                     continue
 
-                new_queue_start = [(media_id, cutout[0], cutout[1], chunk_size, None) for cutout in cutouts]
-                new_queue_start[-1] = (media_id, new_queue_start[-1][1], new_queue_start[-1][2], chunk_size, flag)
+                new_queue_start = [(media_id, cutout[0], cutout[1], chunk_size, flag) for cutout in cutouts]
                 if queue_type == "top_priority":
                     self._top_priority_queue = new_queue_start + self._top_priority_queue[1:]
                 elif queue_type == "buffer":
@@ -252,7 +268,7 @@ class Downloader:
                     self._queue = new_queue_start + self._queue[1:]
                 continue
 
-            self._requests_in_progress.append((media_id, start, end))
+            self._requests_in_progress.append((media_id, start, end, []))
             downloader_tasks.append(asyncio.create_task(download_chunk(media_id, start, end, flag)))
 
             if queue_type == "top_priority":
