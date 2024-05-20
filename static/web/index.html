@@ -19,6 +19,7 @@
         <script src="script/helper/util.js"></script>
         <script src="script/helper/root.js"></script>
         <script src="script/index.js" defer></script>
+        <script src="script/index/player.js" defer></script>
 
         <style>
             .profile-image {
@@ -147,16 +148,17 @@
                     <div class="icon" data-icon="x"></div>
                 </div>
 
-                <div class="video-player">
-                    <div class="controls" style="pointer-events: none;">
+                <div class="video-player" onkeydown="player_onkeydown(event)" tabindex="0">
+                    <div class="controls">
                         <div class="top">
                             <div class="title">NONE</div>
                         </div>
                         <div class="bottom">
                             <div class="upper">
-                                <div class="progress-bar">
+                                <div class="progress-bar" style="--progress: 0%;">
                                     <div class="progress"></div>
                                     <div class="progress-indicator"></div>
+                                    <input type="range" class="progress-slider" min="0" max="100" value="0" step="any" oninput="player_progressbar_oninput(this)" onmousedown="player_progressbar_onmousedown(this)" onchange="player_progressbar_onchange(this)"/>
                                 </div>
                             </div>
 
@@ -171,7 +173,7 @@
 
                                     <div class="icon button icon-next" data-icon="caret-right"></div>
 
-                                    <div class="volume-control button">
+                                    <div class="volume-control button">                                        
                                         <div class="icons">
                                             <div class="icon speaker-loud-icon" data-icon="volume-up"></div>
                                             <div class="icon speaker-icon hidden" data-icon="volume-down"></div>
@@ -179,12 +181,14 @@
                                         </div>
 
                                         <div class="slider-box">
-                                            <input type="range" class="volume-slider" min="0" max="100" value="100" />
+                                            <input type="range" class="volume-slider" min="0" max="100" value="50" step="any" oninput="player_volume_oninput(this)"/>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="panel-right">
-                                    <div class="fullscreen-control button">
+                                    <div class="timer"><span class="current-time">00:00</span>/<span class="total-time">00:00</span></div>
+
+                                    <div class="fullscreen-control button" onclick="toggle_player_fullscreen()">
                                         <div class="icon icon-fullscreen" data-icon="fullscreen"></div>
                                         <div class="icon icon-fullscreen-exit hidden" data-icon="fullscreen-exit"></div>
                                     </div>
@@ -219,7 +223,7 @@
                             </div>
                         </div>
                     </div>
-                    <video id="video-player" controls></video>
+                    <video id="video-player"></video>
                 </div>
             </div>
         </div>

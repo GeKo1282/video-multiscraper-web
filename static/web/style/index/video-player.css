@@ -1,4 +1,5 @@
 #video-player-window {
+    display: block !important;
     width: 100%;
     height: 100%;
     top: 0 !important;
@@ -29,10 +30,17 @@ body.animate #video-player-window {
 }
 
 #video-player-window > .video-player {
-    width: 100%;
-    height: 100%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
+    aspect-ratio: 16 / 9;
+
+    max-width: 100%;
+    max-height: 100%;
 
     position: relative;
+    outline: none;
 }
 
 #video-player {
@@ -55,6 +63,20 @@ body.animate #video-player-window {
     justify-content: space-between;
     overflow: hidden;
     padding: 10px;
+
+    background: linear-gradient(black, transparent 25%, transparent 75%, black);
+
+    opacity: 1;
+    animation: hide-controls 0s forwards;
+    animation-delay: 2s;
+    animation-play-state: running;
+}
+
+#video-player-window .controls:has(:hover) {
+    opacity: 1;
+    animation: show-controls 0s forwards;
+    animation-delay: 0s;
+    animation-play-state: running;
 }
 
 #video-player-window .controls .top {
@@ -63,7 +85,7 @@ body.animate #video-player-window {
 }
 
 #video-player-window .controls .bottom {
-    gap: 20px;
+    position: relative;
     width: 100%;
 
     display: flex;
@@ -71,7 +93,16 @@ body.animate #video-player-window {
 }
 
 #video-player-window .controls .bottom .upper {
-    height: 2px;
+    --transition: 150ms ease;
+    --progressbar-height: 4px;
+    --progressbar-height-hover: 6px;
+    --pointer-size: 10px;
+    --pointer-size-hover: 15px;
+
+    position: absolute;
+    top: -22px;
+
+    height: var(--progressbar-height-hover);
     width: 100%;
 
     display: flex;
@@ -80,13 +111,22 @@ body.animate #video-player-window {
 }
 
 #video-player-window .controls .bottom .upper .progress-bar {
+    --fill-color: darkviolet;
+
+    height: var(--progressbar-height);
     width: calc(100% - 10px);
-    height: 100%;
     background: #444;
     position: relative;
 
-    --fill-color: darkviolet;
+    cursor: pointer;
+
+    transition: height var(--transition);
 }
+
+#video-player-window .controls .bottom .upper:is(:hover, :active) .progress-bar {
+    height: var(--progressbar-height-hover);
+}
+
 
 #video-player-window .controls .bottom .upper .progress-bar .progress {
     position: absolute;
@@ -96,7 +136,38 @@ body.animate #video-player-window {
     width: 100%;
     background: var(--fill-color);
     transform-origin: bottom left;
-    transform: scaleX(0);
+    transform: scaleX(var(--progress));
+}
+
+#video-player-window .controls .bottom .upper .progress-bar .progress-indicator {
+    position: absolute;
+    height: var(--pointer-size);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--fill-color);
+    top: 50%;
+    left: var(--progress);
+    transform: translate(-50%, -50%);
+
+    transition: height var(--transition);
+}
+
+#video-player-window .controls .bottom .upper:is(:hover, :active) .progress-bar .progress-indicator {
+    height: var(--pointer-size-hover);
+}
+
+#video-player-window .controls .bottom .upper .progress-bar :is(.progress, .progress-indicator) {
+    z-index: 100;
+}
+
+#video-player-window .controls .bottom .upper .progress-bar .progress-slider {
+    position: absolute;
+    top: 0;
+    width: 100%;
+    z-index: 200;
+    opacity: 0;
+
+    height: var(--progressbar-height-hover);
 }
 
 #video-player-window .controls .bottom .lower {
@@ -129,6 +200,70 @@ body.animate #video-player-window {
     color: rgb(var(--font-color-light));
 }
 
+#video-player-window .controls .panel-right .timer {
+    aspect-ratio: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+#video-player-window .controls .panel-left .volume-control {
+    aspect-ratio: unset;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+#video-player-window .controls .panel-left .volume-control .icons {
+    height: 100%;
+    aspect-ratio: 1;
+}
+
+#video-player-window .controls .panel-left .volume-control .slider-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    opacity: 0;
+    pointer-events: none;
+    transition: var(--transition-time-short) ease;
+}
+
+#video-player-window .controls .panel-left .volume-control:hover .slider-box {
+    opacity: 1;
+    pointer-events: all;
+}
+
+#video-player-window .controls .panel-left .volume-control .slider-box input {
+    -webkit-appearance: none;
+    appearance: none;
+    overflow: hidden;
+    outline: none;
+
+    width: 200px;
+}
+
+#video-player-window .controls .panel-left .volume-control .slider-box input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 4px;
+    height: 100%;
+    background: rgb(19, 19, 19);
+    cursor: pointer;
+    box-shadow: 1000px 0 0 1000px rgb(var(--font-color));
+    border: none;
+    outline: none;
+}
+
+#video-player-window .controls .panel-left .volume-control .slider-box input::-webkit-slider-runnable-track {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 8px;
+    background: rgb(var(--primary-color));
+    cursor: pointer;
+}
+
 #video-player-window .controls :is(.panel-left, .panel-right) > :is(.icon-previous, .icon-next) {
     transform: scale(0.6);
     color: rgb(var(--font-color));
@@ -138,31 +273,11 @@ body.animate #video-player-window {
     position: relative;
 }
 
-#video-player-window .controls .volume-control > .slider-box {
-    position: absolute;
-    top: calc(-200% - 20px);
-    transform: rotate(-90deg);
-    left: -33px;
-
-    height: 50px;
-    width: 100px;
-
-    padding: 10px;
-
-    background: rgb(var(--background-color));
-
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
 #video-player-window .controls .volume-control > .slider-box > input {
     width: 100%;
 }
 
-#video-player-window .controls .settings.button > .settings-menu:not(.shown),
-#video-player-window .controls .volume-control.button > .slider-box:not(.shown) {
+#video-player-window .controls .settings.button > .settings-menu:not(.shown) {
     display: none;
 }
 
@@ -178,4 +293,22 @@ input[type="num"] {
     height: 4px;
     background: transparent;
     border-radius: 0;
+}
+
+@keyframes show-controls {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes hide-controls {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
 }

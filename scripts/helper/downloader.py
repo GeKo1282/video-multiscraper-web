@@ -36,8 +36,8 @@ class Downloader:
         asyncio.run_coroutine_threadsafe(setter(), self._downloader_loop)
 
     def start(self) -> None:
+        self._running = True # Must be set before starting the thread, otherwise while loop will not run
         threading.Thread(target=lambda: asyncio.run(self._downloader())).start()
-        self._running = True
 
     def stop(self) -> None:
         self._running = False
@@ -61,10 +61,8 @@ class Downloader:
         #Check if data is in database before returning, because every chunk causes flag to be set
         out_data = b""
         chunks = self.database.select("temporary_media_data", ["start_byte", "end_byte", "data"], "media_id = ? AND (NOT start_byte > ? AND NOT end_byte < ?)", [media_id, end, start])
-        print(f"Chunks colliding for {Fore.RED}{start}-{end}{Color.RESET}: {[(chunk[0], chunk[1]) for chunk in chunks]}")
         
         for chunk in chunks:
-            print("Chunk:", chunk[0], chunk[1], "Returning from chunk:", start + len(out_data) - chunk[0], end - chunk[0] + 1)
             out_data += chunk[2][start + len(out_data) - chunk[0]:end - chunk[0] + 1]
 
         while len(out_data) < end - start + 1:
@@ -73,13 +71,9 @@ class Downloader:
 
             out_data = b""
             chunks = self.database.select("temporary_media_data", ["start_byte", "end_byte", "data"], "media_id = ? AND (NOT start_byte > ? AND NOT end_byte < ?)", [media_id, end, start])
-            print(f"Chunks colliding for {Fore.RED}{start}-{end}{Color.RESET}: {[(chunk[0], chunk[1]) for chunk in chunks]}")
 
             for chunk in chunks:
-                print("Chunk:", chunk[0], chunk[1], "Returning from chunk:", start + len(out_data) - chunk[0], end - chunk[0] + 1)
                 out_data += chunk[2][start + len(out_data) - chunk[0]:end - chunk[0] + 1]
-
-        print("Retruning data:", start, end, len(out_data))
 
         return out_data
 

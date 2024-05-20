@@ -9,6 +9,20 @@ global.user_info_updaters = {
     }]
 }
 
+global.user = {
+    settings: {
+        theme: 'dark',
+        language: 'en',
+        autoplay: true,
+        quality: 'auto',
+        volume: {
+            value: 100,
+            type: 'exponential',
+            volume_exponent: 2
+        }
+    }
+}
+
 addLoadEvent(async () => {
     if (!localStorage.getItem('token') || !localStorage.getItem('user_id')) {
         window.location.href = '/login';
@@ -503,7 +517,7 @@ async function open_content_page(content_uid) {
         download_button = make_icon(download_button);
         more_button = make_icon(more_button);
 
-        play_button.setAttribute('onclick', `play('${episode.uid}')`);
+        play_button.setAttribute('onclick', `play('${episode.uid}', '${content_data.title}: ${episode.title}')`);
 
         index.innerText = episode.index + ".";
         title.innerText = shorten_string(episode.title, 30);
@@ -616,85 +630,4 @@ function content_switch_lower(switch_to) {
     new_section.classList.add('shown');
 
     document.getElementById('content-page').scrollTop = lower.getElementsByClassName('containers')[0].offsetTop - document.getElementById('pages-box').clientHeight + Math.min(new_section.clientHeight, 500);
-}
-
-async function play(episode_or_series_uid, optional_episode_index = -1) {
-    let player_data = await new Promise((resolve, reject) => {
-        global.websocket.add_onmessage((decrypted, _, self) => {
-            if (decrypted.action != 'send-players-meta') {
-                global.websocket.pass_onmessage(self, decrypted, _);
-                return;
-            }
-
-            global.websocket.remove_onmessage(self);
-            resolve(decrypted.data);
-        });
-
-        global.websocket.send(JSON.stringify({
-            action: 'get-players-meta',
-            data: {
-                content_uid: episode_or_series_uid,
-                user_id: global.user.info.id,
-                token: global.user.info.token
-            }
-        }));
-    }); 
-
-    let top_quality = Math.max(...player_data.qualities.filter((quality) => quality != "unknown").map((quality) => parseInt(quality.slice(0, -1))));
-
-    for (let source of player_data.sources) {
-        if (source.quality == top_quality + "p") {
-            global.websocket.send(JSON.stringify({
-                action: 'get-player-data',
-                data: {
-                    media_uid: source.uid,
-                    scrape: true,
-                    user_id: global.user.info.id,
-                    token: global.user.info.token
-                }
-            }));
-
-            let full_player_data = await new Promise((resolve, reject) => {
-                global.websocket.add_onmessage((decrypted, _, self) => {
-                    if (decrypted.action != 'send-player-data') {
-                        global.websocket.pass_onmessage(self, decrypted, _);
-                        return;
-                    }
-
-                    console.log(decrypted)
-
-                    global.websocket.remove_onmessage(self);
-                    resolve(decrypted.data);
-                });
-                
-            });
-
-            console.log(full_player_data);
-
-            open_video_player(full_player_data.url, false);
-            break;
-        }
-    }
-}
-
-async function open_video_player(url, autoplay = false) {
-    let video_player = document.getElementById('video-player');
-    document.getElementById('video-player-window').classList.add('shown');
-    
-    video_player.src = url;
-    if (autoplay) video_player.play();
-}
-
-function close_video_player() {
-    document.getElementById('video-player').pause();
-    document.getElementById('video-player-window').classList.remove('shown');
-}
-
-function playpause() {
-    let video = document.getElementById('video-player');
-    if (video.paused) {
-        video.play();
-    } else {
-        video.pause();
-    }
 }

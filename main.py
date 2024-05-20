@@ -152,7 +152,7 @@ class ProgramController:
             "id INTEGER PRIMARY KEY AUTOINCREMENT",
 
             "user_id TEXT REFERENCES users(id) NOT NULL",
-            "media_id TEXT REFERENCES media(id) NOT NULL",
+            "media_id INT REFERENCES media(id) NOT NULL",
             "token TEXT NOT NULL",
             "created INTEGER NOT NULL DEFAULT CURRENT_TIMESTAMP",
             "expires INTEGER NOT NULL"
@@ -436,3 +436,4 @@ if __name__ == "__main__":
     asyncio.run(main())
     
 #TODO: Asynchronously download thumbnails in background, and if already downloaded serve own url instead of upstream
+#TODO: OA - Add support for preffered sub group (autopicked) and prefering sub over quality or vice versa

@@ -527,3 +527,27 @@ function sanitize(string) {
 function normalize(string) {
     return string.toLowerCase();
 }
+
+function format_time(seconds, trim_hours = true, trim_minutes = false) {
+    let hours = Math.floor(seconds / 3600);
+    let minutes = Math.floor((seconds % 3600) / 60);
+    let remaining_seconds = seconds % 60;
+
+    let result = '';
+
+    if (hours > 0) {
+        result += (`0${hours}`).slice(-2) + ':';
+    } else if (!trim_hours) {
+        result += '00:';
+    }
+
+    if (minutes > 0) {
+        result += (`0${minutes}`).slice(-2) + ':';
+    } else if (!trim_minutes) {
+        result += '00:';
+    }
+
+    result += (`0${remaining_seconds}`).slice(-2);
+
+    return result;
+}
