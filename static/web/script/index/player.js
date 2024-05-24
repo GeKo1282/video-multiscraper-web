@@ -16,6 +16,40 @@ function assign_player_handlers() {
         progressbar.value = video_player.currentTime;
         player_progressbar_oninput(progressbar);
     }
+
+    video_player.onplay = () => {
+        if (!global.status_updater_running) {
+            setTimeout(update_time_status, 2000, video_player.dataset.contentUid, true, true);
+        }
+    }
+}
+
+function update_time_status(content_uid, recurse = false, force = false) {
+    if (document.getElementById('video-player').paused && !force) {
+        global.status_updater_running = false;
+        return;
+    }
+
+    global.status_updater_running = true;
+
+    let video_player = document.getElementById('video-player');
+
+    global.websocket.send(JSON.stringify({
+        action: 'update-watch-progress',
+        data: {
+            content_uid: content_uid,
+            user_id: global.user.info.id,
+            token: global.user.info.token,
+            progress: video_player.currentTime
+        }
+    }));
+
+    if (!recurse) {
+        global.status_updater_running = false;
+        return;
+    }
+
+    setTimeout(update_time_status, 2000, content_uid, recurse, false);
 }
 
 function player_onkeydown(event) {
@@ -60,7 +94,7 @@ function toggle_player_fullscreen() {
     }
 }
 
-async function play(episode_or_series_uid, title, optional_episode_index = -1) {
+async function play(content_uid, title, optional_episode_index = -1) {
     let player_data = await new Promise((resolve, reject) => {
         global.websocket.add_onmessage((decrypted, _, self) => {
             if (decrypted.action != 'send-players-meta') {
@@ -75,7 +109,7 @@ async function play(episode_or_series_uid, title, optional_episode_index = -1) {
         global.websocket.send(JSON.stringify({
             action: 'get-players-meta',
             data: {
-                content_uid: episode_or_series_uid,
+                content_uid: content_uid,
                 user_id: global.user.info.id,
                 token: global.user.info.token
             }
@@ -113,13 +147,13 @@ async function play(episode_or_series_uid, title, optional_episode_index = -1) {
 
             console.log(full_player_data);
 
-            open_video_player(full_player_data.url, title, false);
+            open_video_player(full_player_data.url, content_uid, title, false);
             break;
         }
     }
 }
 
-async function open_video_player(url, title = null, autoplay = true) {
+async function open_video_player(url, content_uid, title = null, autoplay = true) {
     let video_player = document.getElementById('video-player');
     let progressbar = document.querySelector("#video-player-window .controls .bottom .upper .progress-bar .progress-slider");
     let total_time = document.querySelector("#video-player-window .controls .bottom .total-time");
@@ -136,6 +170,7 @@ async function open_video_player(url, title = null, autoplay = true) {
     }
 
     video_player.src = url;
+    video_player.dataset.contentUid = content_uid;
     if (autoplay) video_player.play();
 }
 

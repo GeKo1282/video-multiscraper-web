@@ -120,9 +120,23 @@ class ProgramController:
             "type TEXT NOT NULL", #eg. movie, series, episode, thumbnail
             "weight REAL NOT NULL",
             "title TEXT NOT NULL",
+            "length INTEGER",
+            "parent_uid TEXT REFERENCES content(uid)", #for episodes, series, seasons, etc.
+            "self_index INTEGER", # for episodes, seasons, etc.
 
             # actual content entry, because it might differ from service to service
             "meta TEXT NOT NULL DEFAULT '{}'",
+        ])
+        
+        self.database.create_table("watch_progress", [
+            "id INTEGER PRIMARY KEY AUTOINCREMENT",
+
+            "user_id TEXT REFERENCES users(id) NOT NULL",
+            "content_id TEXT REFERENCES content(uid) NOT NULL",
+
+            "progress INTEGER NOT NULL DEFAULT 0",
+            "updated_at INTEGER NOT NULL",
+            "UNIQUE(user_id, content_id)"
         ])
 
         self.database.create_table("media", [
@@ -138,6 +152,7 @@ class ProgramController:
             "media_format TEXT",
             "media_name TEXT NOT NULL", #eg. thumbnail, video, opening, etc. Used for geting through url.
             "media_id TEXT NOT NULL", #for when there is more than one media of the same type for the same content, eg. multiple resolutions or thumbnails.
+            "media_duration INTEGER",
             # /media/{refer_id}/{media_name}[?format={format}][&id={media_id}][&meta_arg=meta_val]: /media/1234/thumbnail, /media/1234/opening?format=mp4, /media/1234/video?format=mp4&id=1080p, /media/1234/thumbnail?id=1
             
             "origin_url TEXT DEFAULT NULL",
@@ -413,7 +428,15 @@ class ProgramController:
             if data.get('action') == 'download-media':
                 asyncio.create_task(download_media(session, websocket, data, self.database))
                 continue
-            
+
+            if data.get('action') == 'update-watch-progress':
+                asyncio.create_task(update_watch_progress(session, websocket, data, self.database))
+                continue
+
+            if data.get('action') == 'get-watch-progress':
+                asyncio.create_task(get_watch_progress(session, websocket, data, self.database))
+                continue
+
             print(f"Received: {data}")
 
         try:

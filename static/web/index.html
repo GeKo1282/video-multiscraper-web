@@ -10,6 +10,7 @@
         <link rel="stylesheet" href="style/index.css" />
         <link rel="stylesheet" href="style/index/content.css" />
         <link rel="stylesheet" href="style/index/video-player.css" />
+        <link rel="stylesheet" href="style/index/user-home-page.css" />
 
         <script src="script/helper/forge.min.js"></script>
         <script src="script/helper/aes.js"></script>
@@ -20,6 +21,7 @@
         <script src="script/helper/root.js"></script>
         <script src="script/index.js" defer></script>
         <script src="script/index/player.js" defer></script>
+        <script src="script/index/homepage.js" defer></script>
 
         <style>
             .profile-image {
@@ -57,7 +59,16 @@
                 </div>
 
                 <div id="pages-box">                    
-                    <div class="page window animate shown" id="user-home-page" data-path="/home"></div>
+                    <div class="page window animate shown" id="user-home-page" data-path="/home">
+
+                        <div class="section recently-watched">
+                            <div class="header">Recently Watched</div>
+                            <div class="vertical-scroll">
+
+                            </div>
+                        </div>
+
+                    </div>
 
                     <div class="page window animate" id="search-results-page">
                         <div class="button back-button" onclick="switch_page('user-home-page')">
@@ -143,7 +154,7 @@
                 </div>
             </div>
 
-            <div id="video-player-window" class="window shown">
+            <div id="video-player-window" class="window">
                 <div class="close-button" onclick="close_video_player()">
                     <div class="icon" data-icon="x"></div>
                 </div>

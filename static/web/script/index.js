@@ -23,6 +23,13 @@ global.user = {
     }
 }
 
+global.page_switch_callbacks = {
+    'global': [() => {
+        hide_user_menu();
+        close_url_popup();
+    }],
+}
+
 addLoadEvent(async () => {
     if (!localStorage.getItem('token') || !localStorage.getItem('user_id')) {
         window.location.href = '/login';
@@ -38,6 +45,13 @@ addLoadEvent(async () => {
     assign_handlers();
     make_sliders();
     await initialize_websocket_communications(global.default_socket_hander);
+    
+    if (global.websocket_triggers) {
+        for (let trigger of global.websocket_triggers) {
+            trigger();
+        }
+    }
+
     await get_user_info();
     parse_urlargs();
 })
@@ -94,6 +108,30 @@ function make_sliders() {
     }
 }
 
+function add_page_switch_callback(page_id, callback) {
+    if (!global.page_switch_callbacks) global.page_switch_callbacks = {};
+    if (!global.page_switch_callbacks[page_id]) global.page_switch_callbacks[page_id] = [];
+
+    global.page_switch_callbacks[page_id].push(callback);
+}
+
+function add_global_page_switch_callback(callback) {
+    if (!global.page_switch_callbacks) global.page_switch_callbacks = {};
+    if (!global.page_switch_callbacks['global']) global.page_switch_callbacks['global'] = [];
+
+    global.page_switch_callbacks['global'].push(callback);
+}
+
+function remove_page_switch_callback(page_id, callback) {
+    if (!global.page_switch_callbacks || !global.page_switch_callbacks[page_id]) return;
+    if (!callback) global.page_switch_callbacks[page_id] = [];
+    
+    let index = global.page_switch_callbacks[page_id].indexOf(callback);
+    if (index == -1) return;
+
+    global.page_switch_callbacks[page_id].splice(index, 1);
+}
+
 function switch_page(page_id, change_url = true, clear_favicon = true) {
     if (!page_id.endsWith('-page')) page_id += '-page';
 
@@ -110,6 +148,12 @@ function switch_page(page_id, change_url = true, clear_favicon = true) {
 
     if (change_url) window.history.pushState({id: "100"}, target.id, target.dataset.path ? target.dataset.path : '/' + target.id.replace('-page', ''));
     if (clear_favicon) changeFavicon('/media/favicon.ico');
+
+    if (!global.page_switch_callbacks || (!global.page_switch_callbacks[page_id] && !global.page_switch_callbacks['global'])) return;
+
+    for (let callback of [...(global.page_switch_callbacks['global'] ? global.page_switch_callbacks['global'] : []), ...(global.page_switch_callbacks[page_id] ? global.page_switch_callbacks[page_id] : [])]) {
+        setTimeout(callback, 0);
+    }
 }
 
 async function get_user_info() {
@@ -630,4 +674,30 @@ function content_switch_lower(switch_to) {
     new_section.classList.add('shown');
 
     document.getElementById('content-page').scrollTop = lower.getElementsByClassName('containers')[0].offsetTop - document.getElementById('pages-box').clientHeight + Math.min(new_section.clientHeight, 500);
+}
+
+async function get_watch_progress(uid_or_all = "all", top_level = false) {
+    let promise = new Promise((resolve, reject) => {
+        global.websocket.add_onmessage((decrypted, _, self) => {
+            if (decrypted.action != 'get-watch-progress') {
+                global.websocket.pass_onmessage(self, decrypted, _);
+                return;
+            }
+
+            global.websocket.remove_onmessage(self);
+            resolve(decrypted.data);
+        })
+    });
+
+    global.websocket.send(JSON.stringify({
+        action: 'get-watch-progress',
+        data: {
+            user_id: global.user.info.id,
+            token: global.user.info.token,
+            top_level: top_level,
+            ...(uid_or_all == "all" ? {} : {uid: uid_or_all})
+        }
+    }));
+
+    return await promise; 
 }

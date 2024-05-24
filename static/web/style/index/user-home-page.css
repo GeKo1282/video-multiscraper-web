@@ -1,0 +1,31 @@
+#user-home-page {
+    padding: 20px !important;
+}
+
+#user-home-page .section {
+    display: flex;
+    align-items: start;
+    justify-content: start;
+    flex-direction: column;
+    
+    width: 100%;
+    min-height: 350px;
+
+    gap: 10px;
+}
+
+#user-home-page .section .header {
+    font-size: 40px;
+    color: rgb(var(--font-color));
+}
+
+#user-home-page .section .vertical-scroll {
+    width: 100%;
+    flex: 1 1 1px;
+
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    flex-direction: row;
+    gap: 10px;
+}

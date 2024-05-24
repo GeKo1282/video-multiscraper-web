@@ -237,7 +237,10 @@ async def search(session: SocketSession, websocket: WebSocketClientProtocol, dat
     }, session)
 
 async def get_content_info(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, oa: OgladajAnime_pl, database: Database):
-    uid = data['data'].get('content_uid')
+    content_uid = data['data'].get('content_uid')
+    media_uid = data['data'].get('media_uid')
+    preffered_type = data['data'].get('preffered_type')
+    scrape = data['data'].get('scrape', True)
     user_id = data['data'].get('user_id', "")
     token = data['data'].get('token', "")
 
@@ -247,14 +250,31 @@ async def get_content_info(session: SocketSession, websocket: WebSocketClientPro
         })
         return
     
-    if not uid:
+    if not content_uid and not media_uid:
         await send_error(websocket, session, "Invalid data.", action=data.get('action'))
         return
     
-    content = oa.get_by_uid(uid, True, True)
+    if content_uid:
+        content = oa.get_by_uid(content_uid, True, True)
 
-    if type(content) in [OA_Movie, OA_Series] and not content.is_scrapped:
-        content = await content.scrape()
+        if type(content) in [OA_Movie, OA_Series] and not content.is_scrapped and scrape:
+            content = await content.scrape()
+
+    else:
+        media = database.select("media", ["refer_id"], "uid = ?", [media_uid])
+        if not media:
+            await send_error(websocket, session, "Media not found.", action=data.get('action'))
+            return
+        
+        content = oa.get_by_uid(media[0][0], True, True)
+
+        if type(content) in [OA_Movie, OA_Series] and not content.is_scrapped and scrape:
+            content = await content.scrape()
+
+    if isinstance(content, Episode) and preffered_type.lower() == "series":
+        content = content.series
+        if not content.is_scrapped and scrape:
+            content = await content.scrape()
 
     await WebSocketServer.send(websocket, {
         "action": "send-content-info",
@@ -448,3 +468,103 @@ async def download_media(session: SocketSession, websocket: WebSocketClientProto
         return
     
     content = database.select("media", ["refer_id"], "uid = ?", [uid])
+
+async def update_watch_progress(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, database: Database):
+    content_uid = data['data'].get('content_uid') or data['data'].get('uid')
+    user_id = data['data'].get('user_id', "")
+    token = data['data'].get('token', "")
+    progress = data['data'].get('progress')
+
+    if not content_uid or not user_id or not token or not progress:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+    
+    if not authorize_user(user_id, token, database):
+        await send_error(websocket, session, "Invalid credentials.", code=111, action=data.get('action'), additional={
+            "success": False
+        })
+        return
+    
+    id = database.select("watch_progress", ["id"], "content_id = ? AND user_id = ?", [content_uid, user_id])
+
+    if id:
+        database.update("watch_progress", ["progress", "updated_at"], [int(progress), int(datetime.now().timestamp())], "id = ?", [id[0][0]])
+    else:
+        database.insert("watch_progress", ["user_id", "content_id", "progress", "updated_at"], [user_id, content_uid, int(progress), int(datetime.now().timestamp())])
+
+    await WebSocketServer.send(websocket, {
+        "action": "update-watch-progress",
+        "success": True
+    }, session)
+
+async def get_watch_progress(session: SocketSession, websocket: WebSocketClientProtocol, data: dict, database: Database):
+    content_uid = data['data'].get('content_uid') or data['data'].get('uid')
+    user_id = data['data'].get('user_id', "")
+    token = data['data'].get('token', "")
+    top_level = data['data'].get('top_level', False)
+
+    if not user_id or not token:
+        await send_error(websocket, session, "Invalid data.", action=data.get('action'))
+        return
+    
+    if not authorize_user(user_id, token, database):
+        await send_error(websocket, session, "Invalid credentials.", code=111, action=data.get('action'), additional={
+            "success": False
+        })
+        return
+    
+    if content_uid:
+        progress_data = database.select("watch_progress", ["content_id", "progress"], "user_id = ? AND content_id = ?", [user_id, content_uid])
+    else:
+        progress_data = database.select("watch_progress", ["content_id", "progress"], "user_id = ?", [user_id])
+
+    if not progress_data and content_uid:
+        await send_error(websocket, session, "Invalid request!", code=112, action=data.get('action'), additional={
+            "success": False
+        })
+
+    to_return = []
+    for entry in progress_data:
+        total = [*[duration for duration in database.select("media", ["media_duration"], "refer_id = ? AND media_type='video'", [entry[0]]) if duration], None][0]
+        total = total[0] if total and total[0] else "N/A"
+        to_return.append({
+            "uid": entry[0],
+            "progress": entry[1],
+            "total": total
+        })
+
+    if not top_level:
+        await WebSocketServer.send(websocket, {
+            "action": "get-watch-progress",
+            "success": True,
+            "data": to_return
+        }, session)
+
+    for index, entry in enumerate(to_return):
+        parent = ((entry['uid'],),)
+        while True:
+            parent = database.select("content", ["parent_uid", "uid", "type", "self_index"], "uid = ?", [parent[0][0]])
+
+            if not parent:
+                break
+
+            if parent[0][1] == entry['uid']:
+                to_return[index] = {
+                    **to_return[index],
+                    "uid": parent[0][1],
+                    "type": parent[0][2],
+                    **({"index": parent[0][3]} if parent[0][3] else {})
+                }
+                continue
+
+            to_return[index][parent[0][2]] = {
+                "uid": parent[0][1],
+                **({"index": parent[0][3]} if parent[0][3] else {})
+            }
+
+
+    await WebSocketServer.send(websocket, {
+        "action": "get-watch-progress",
+        "success": True,
+        "data": to_return
+    }, session)
