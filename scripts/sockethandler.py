@@ -514,9 +514,9 @@ async def get_watch_progress(session: SocketSession, websocket: WebSocketClientP
         return
     
     if content_uid:
-        progress_data = database.select("watch_progress", ["content_id", "progress"], "user_id = ? AND content_id = ?", [user_id, content_uid])
+        progress_data = database.select("watch_progress", ["content_id", "progress", "updated_at"], "user_id = ? AND content_id = ?", [user_id, content_uid])
     else:
-        progress_data = database.select("watch_progress", ["content_id", "progress"], "user_id = ?", [user_id])
+        progress_data = database.select("watch_progress", ["content_id", "progress", "updated_at"], "user_id = ?", [user_id])
 
     if not progress_data and content_uid:
         await send_error(websocket, session, "Invalid request!", code=112, action=data.get('action'), additional={
@@ -530,7 +530,8 @@ async def get_watch_progress(session: SocketSession, websocket: WebSocketClientP
         to_return.append({
             "uid": entry[0],
             "progress": entry[1],
-            "total": total
+            "total": total,
+            "updated": entry[2]
         })
 
     if not top_level:
